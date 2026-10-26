@@ -298,6 +298,97 @@ DIRECT_CONNECTION_OUTPUT="$(show_connection 3)"
 [[ "$DIRECT_CONNECTION_OUTPUT" != *'适用：'* ]]
 [[ "$DIRECT_CONNECTION_OUTPUT" != *'REALITY 不需要传统 TLS 证书'* ]]
 
+# Moving one legacy shared-port node isolates its credentials and preserves the
+# other links. Updates must retain every listener, including an installation
+# whose nodes have all moved away from the original default port.
+(
+  NODE_PORT_DIR="${TEST_DIR}/node-ports"
+  mkdir -p "$NODE_PORT_DIR/reload"
+  MODEL_FILE="${NODE_PORT_DIR}/model.json"
+  STATE_FILE="$MODEL_FILE"
+  CONFIG_FILE="${NODE_PORT_DIR}/config.json"
+  jq '.nodes[1].inboundPort = 62033' "$GENERATED_STATE" >"$MODEL_FILE"
+  validate_model "$MODEL_FILE"
+  render_config "$CONFIG_FILE" "$NODE_PORT_DIR"
+  jq -e --slurpfile s "$MODEL_FILE" '
+    (.inbounds | map(.port) | sort) == [443, 62033]
+    and ([.inbounds[] | select(.port == 443) | .settings.clients[].id]
+         == [$s[0].nodes[0].uuid, $s[0].nodes[2].uuid])
+    and ([.inbounds[] | select(.port == 62033) | .settings.clients[].id]
+         == [$s[0].nodes[1].uuid])
+    and ([.inbounds[] | select(.port == 62033) | .streamSettings.realitySettings.shortIds[]]
+         == [$s[0].nodes[1].shortId])
+    and ((.routing.rules[-1].inboundTag | sort) == (.inbounds | map(.tag) | sort))
+  ' "$CONFIG_FILE" >/dev/null
+  [[ "$(build_share_link 1)" == "$LINK_ONE" ]]
+  [[ "$(build_share_link 2)" == "${LINK_TWO/:443\?/:62033\?}" ]]
+  [[ "$(build_share_link 3)" == "$LINK_THREE" ]]
+  XRAY_LOCATION_ASSET="$TEST_ASSETS" "$TEST_XRAY" run -test -c "$CONFIG_FILE"
+  assert_upgrade_invariants "$MODEL_FILE" "$CONFIG_FILE" "$MODEL_FILE" "$CONFIG_FILE"
+  jq '.nodes[1].inboundPort = 62034' "$MODEL_FILE" >"${NODE_PORT_DIR}/wrong-port.json"
+  if (assert_upgrade_invariants "$MODEL_FILE" "$CONFIG_FILE" \
+      "${NODE_PORT_DIR}/wrong-port.json" "$CONFIG_FILE") >/dev/null 2>&1; then
+    printf '升级未拒绝单节点端口被改变。\n' >&2
+    exit 1
+  fi
+  jq '(.inbounds[] | select(.port == 62033) | .port) = 62034' "$CONFIG_FILE" >"${NODE_PORT_DIR}/wrong-config.json"
+  if (assert_upgrade_invariants "$MODEL_FILE" "$CONFIG_FILE" \
+      "$MODEL_FILE" "${NODE_PORT_DIR}/wrong-config.json") >/dev/null 2>&1; then
+    printf '升级未检查独立端口的 Xray 入站。\n' >&2
+    exit 1
+  fi
+  for invalid_port in null 0 65536 62033.5 '"62033"'; do
+    jq --argjson port "$invalid_port" '.nodes[1].inboundPort = $port' \
+      "$MODEL_FILE" >"${NODE_PORT_DIR}/invalid.json"
+    if (validate_model "${NODE_PORT_DIR}/invalid.json") >/dev/null 2>&1; then
+      printf '接受了无效的节点入口端口：%s\n' "$invalid_port" >&2
+      exit 1
+    fi
+  done
+  jq '.nodes |= map(.inboundPort = (62030 + .number))' "$MODEL_FILE" >"${MODEL_FILE}.new"
+  mv -- "${MODEL_FILE}.new" "$MODEL_FILE"
+  render_config "$CONFIG_FILE" "$NODE_PORT_DIR"
+  [[ "$(config_reality_private_key "$CONFIG_FILE")" == "$PRIVATE_KEY" ]]
+  OLD_PORT_PRIVATE_KEY="$PRIVATE_KEY"
+  OLD_PORT_PUBLIC_KEY="$PUBLIC_KEY"
+  load_model "${NODE_PORT_DIR}/reload" "$TEST_XRAY"
+  [[ "$PRIVATE_KEY" == "$OLD_PORT_PRIVATE_KEY" && "$PUBLIC_KEY" == "$OLD_PORT_PUBLIC_KEY" ]]
+  render_state "${NODE_PORT_DIR}/updated-state.json" "$TEST_VERSION"
+  render_config "${NODE_PORT_DIR}/updated-config.json" "${NODE_PORT_DIR}/reload"
+  assert_upgrade_invariants "$STATE_FILE" "$CONFIG_FILE" \
+    "${NODE_PORT_DIR}/updated-state.json" "${NODE_PORT_DIR}/updated-config.json"
+  XRAY_LOCATION_ASSET="$TEST_ASSETS" "$TEST_XRAY" run -test -c "${NODE_PORT_DIR}/updated-config.json"
+  printf '单节点端口分组、链接隔离和升级保留检查通过。\n'
+)
+
+# Fresh installations keep the selected first port (including an explicit
+# low port), then allocate separate ports even if the install override remains
+# in the environment. No installed state is needed to reserve earlier nodes.
+(
+  FRESH_PORT_DIR="${TEST_DIR}/fresh-ports"
+  mkdir -p "$FRESH_PORT_DIR"
+  MODEL_FILE="${FRESH_PORT_DIR}/model.json"
+  SECRETS_FILE="${FRESH_PORT_DIR}/secrets.json"
+  STATE_FILE="${FRESH_PORT_DIR}/not-installed.json"
+  collect_panel_reserved_ports() { PANEL_RESERVED_PORTS=(); }
+  port_is_listening() { return 1; }
+  generate_auto_port_candidate() { AUTO_PORT_CANDIDATE=62050; }
+  XRAY_CHAIN_PORT=443
+  NODE_TYPE='direct'
+  SOCKS_EXIT_IP='203.0.113.10'
+  for first_port in 62031 443; do
+    jq --argjson port "$first_port" '.nodes = [] | .nextNodeNumber = 1 | .inboundPort = $port' \
+      "$GENERATED_STATE" >"$MODEL_FILE"
+    printf '{}\n' >"$SECRETS_FILE"
+    append_current_node_to_model "$TEST_XRAY"
+    append_current_node_to_model "$TEST_XRAY"
+    jq -e --argjson port "$first_port" '.inboundPort == $port
+      and .nodes[0].inboundPort == $port and .nodes[1].inboundPort == 62050' "$MODEL_FILE" >/dev/null
+    [[ "$XRAY_CHAIN_PORT" == 443 ]]
+  done
+  printf '首次安装逐节点分配端口与显式首端口兼容检查通过。\n'
+)
+
 # Pausing one node keeps its identity, link, and stored outbound credentials,
 # but removes every route to that outbound and sends the user to blocked.
 # Resuming restores the same link. A configuration with every node paused is
@@ -600,6 +691,11 @@ generate_node_identity() {
 }
 append_batch_nodes_to_model "$TEST_XRAY"
 [[ "${NEW_NODE_IDS[*]}" == 'node-4 node-5' ]]
+jq -e '. as $s | [.nodes[] | (.inboundPort // $s.inboundPort)] as $ports
+  | $ports[2] >= 62001 and $ports[2] <= 65534
+    and $ports[3] >= 62001 and $ports[3] <= 65534
+    and $ports[2] != $ports[3] and $ports[2] != $ports[0] and $ports[3] != $ports[0]
+' "$MODEL_FILE" >/dev/null
 jq -e '
   .nextNodeNumber == 6
   and ([.nodes[].id] == ["node-2", "node-3", "node-4", "node-5"])

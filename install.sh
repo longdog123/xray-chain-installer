@@ -5,7 +5,7 @@
 set -Eeuo pipefail
 umask 077
 
-SCRIPT_VERSION="0.2.16"
+SCRIPT_VERSION="0.2.18"
 CURRENT_STATE_SCHEMA=2
 SERVICE_NAME="xray-chain.service"
 RUNTIME_USER="xray-chain"
@@ -16,8 +16,8 @@ KNOWN_BAD_REALITY_TARGET="www.microsoft.com:443"
 MAX_BATCH_SIZE=50
 AUTO_PORT_MIN=62001
 AUTO_PORT_MAX=65534
-INSTALLER_RAW_URL="https://raw.githubusercontent.com/feng9254/xray-chain-installer/main/install.sh"
-INSTALLER_REPOSITORY="feng9254/xray-chain-installer"
+INSTALLER_RAW_URL="https://raw.githubusercontent.com/longdog123/xray-chain-installer/main/install.sh"
+INSTALLER_REPOSITORY="longdog123/xray-chain-installer"
 INSTALLER_BRANCH="main"
 INSTALLER_API_URL="https://api.github.com/repos/${INSTALLER_REPOSITORY}"
 INSTALLER_RAW_BASE="https://raw.githubusercontent.com/${INSTALLER_REPOSITORY}"
@@ -1064,10 +1064,12 @@ generate_auto_port_candidate() {
 
 select_inbound_port() {
   local requested="${XRAY_CHAIN_PORT:-}" candidate attempt
+  local excluded_ports=" $* "
   collect_panel_reserved_ports
   if [[ -n "$requested" ]]; then
     valid_port "$requested" \
       || die "XRAY_CHAIN_PORT 必须是 1-65535 的单个整数端口。"
+    [[ "$excluded_ports" != *" $requested "* ]] || die "指定端口已分配给现有节点。"
     if port_is_listening "$requested"; then
       die "指定端口 ${requested} 已被现有 TCP 或 UDP 服务占用。"
     fi
@@ -1084,6 +1086,7 @@ select_inbound_port() {
   for ((attempt = 1; attempt <= 128; attempt += 1)); do
     generate_auto_port_candidate
     candidate="$AUTO_PORT_CANDIDATE"
+    [[ "$excluded_ports" == *" $candidate "* ]] && continue
     port_is_common_or_panel_port "$candidate" && continue
     panel_port_is_reserved "$candidate" && continue
     if ! port_is_listening "$candidate"; then
@@ -1094,18 +1097,25 @@ select_inbound_port() {
   die "连续 128 次未找到可用高位端口，请检查现有监听服务后重试。"
 }
 
+model_inbound_ports() {
+  jq -r '. as $s | if (.schema // 1) == 2 then
+    [.nodes[] | (.inboundPort // $s.inboundPort)] | unique[]
+    else .inboundPort end' "$1"
+}
+
 assert_model_port_available() {
-  local file="$1" port installed_port=''
-  port="$(jq -er '.inboundPort' "$file")"
-  port_is_listening "$port" || return 0
+  local file="$1" port installed_ports=''
   if [[ -r "$STATE_FILE" ]]; then
-    installed_port="$(jq -r '.inboundPort // empty' "$STATE_FILE" 2>/dev/null || true)"
+    installed_ports="$(model_inbound_ports "$STATE_FILE" 2>/dev/null || true)"
   fi
-  if [[ "$installed_port" == "$port" ]] \
-    && systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
-    return 0
-  fi
-  die "端口 ${port}/tcp 在确认配置期间被其他程序占用，请重新运行。"
+  while IFS= read -r port; do
+    port_is_listening "$port" || continue
+    if [[ $'\n'"$installed_ports"$'\n' == *$'\n'"$port"$'\n'* ]] \
+      && systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
+      continue
+    fi
+    die "端口 ${port}/tcp 在确认配置期间被其他程序占用，请重新运行。"
+  done < <(model_inbound_ports "$file")
 }
 
 collect_global_settings() {
@@ -1313,7 +1323,7 @@ validate_model() {
     .schema == 2
     and (.installedAt | type == "string" and length > 0)
     and (.serverAddress | type == "string" and length > 0)
-    and (.inboundPort | type == "number" and . >= 1 and . <= 65535)
+    and (.inboundPort | type == "number" and floor == . and . >= 1 and . <= 65535)
     and (.realityTarget | type == "string" and length > 0)
     and (.serverName | type == "string" and length > 0)
     and (.realityPublicKey | type == "string" and length > 0)
@@ -1331,6 +1341,8 @@ validate_model() {
       and (.spiderX | type == "string" and startswith("/") and length <= 256)
       and (.udpMode == "block" or .udpMode == "proxy")
       and (.enabled | type == "boolean")
+      and ((has("inboundPort") | not)
+        or (.inboundPort | type == "number" and floor == . and . >= 1 and . <= 65535))
       and ((.type // "socks") == "socks" or (.type // "socks") == "direct")
       and (
         if (.type // "socks") == "socks" then
@@ -1375,7 +1387,8 @@ load_model() {
   [[ -r "$STATE_FILE" && -r "$CONFIG_FILE" ]] || die "未找到完整的 xray-chain 安装状态。"
   schema="$(jq -r '.schema // 1' "$STATE_FILE" 2>/dev/null)" || die "状态文件不是有效 JSON。"
 
-  private_key="$(jq -er '.inbounds[] | select(.tag == "vless-in") | .streamSettings.realitySettings.privateKey' "$CONFIG_FILE" 2>/dev/null || true)"
+  private_key="$(config_reality_private_key "$CONFIG_FILE" 2>/dev/null)" \
+    || die "现有配置缺少一致的 REALITY 私钥，未修改现有服务。"
   if [[ "$schema" == '2' ]]; then
     jq '.nodes |= map(. + {
       type: (.type // "socks"),
@@ -1496,11 +1509,21 @@ make_unique_node_name() {
 }
 
 append_current_node_to_model() {
-  local candidate_xray="$1" number node_id email udp_mode model_tmp secrets_tmp
+  local candidate_xray="$1" number node_id email udp_mode model_tmp secrets_tmp node_port
+  local XRAY_CHAIN_PORT=''
+  local -a reserved_ports=()
   generate_unique_node_identity "$candidate_xray"
   number="$(jq -er '.nextNodeNumber' "$MODEL_FILE")"
   node_id="node-${number}"
   email="${node_id}@puppyip.local"
+  if [[ "$(jq '.nodes | length' "$MODEL_FILE")" == '0' ]]; then
+    node_port="$(jq -er '.inboundPort' "$MODEL_FILE")"
+  else
+    mapfile -t reserved_ports < <(jq -r '. as $s
+      | [.inboundPort, (.nodes[] | (.inboundPort // $s.inboundPort))] | unique[]' "$MODEL_FILE")
+    select_inbound_port "${reserved_ports[@]}"
+    node_port="$INBOUND_PORT"
+  fi
   NODE_NAME="$(make_unique_node_name)"
   if [[ "$NODE_TYPE" == 'direct' ]]; then
     udp_mode='proxy'
@@ -1521,6 +1544,7 @@ append_current_node_to_model() {
     --argjson number "$number" \
     --arg name "$NODE_NAME" \
     --arg email "$email" \
+    --argjson inbound_port "$node_port" \
     --arg uuid "$UUID" \
     --arg short_id "$SHORT_ID" \
     --arg spider_x "$SPIDER_X" \
@@ -1535,6 +1559,7 @@ append_current_node_to_model() {
         number: $number,
         name: $name,
         email: $email,
+        inboundPort: $inbound_port,
         uuid: $uuid,
         shortId: $short_id,
         spiderX: $spider_x,
@@ -1735,18 +1760,23 @@ render_config() {
     '
     ($state[0]) as $s
     | ($secrets[0]) as $passwords
-    |
+    | ($s.nodes | group_by(.inboundPort // $s.inboundPort)) as $port_groups
+    | def inbound_tag($port):
+        if $port == $s.inboundPort then "vless-in" else "vless-in-" + ($port | tostring) end;
     {
       log: {loglevel: "warning"},
       inbounds: [
+        $port_groups[] as $nodes
+        | ($nodes[0].inboundPort // $s.inboundPort) as $port
+        |
         {
-          tag: "vless-in",
+          tag: inbound_tag($port),
           listen: "0.0.0.0",
-          port: $s.inboundPort,
+          port: $port,
           protocol: "vless",
           settings: {
             clients: [
-              $s.nodes[] | {
+              $nodes[] | {
                 id: .uuid,
                 email: .email,
                 flow: "xtls-rprx-vision"
@@ -1768,7 +1798,7 @@ render_config() {
               xver: 0,
               serverNames: [$s.serverName],
               privateKey: $private_key,
-              shortIds: [$s.nodes[].shortId]
+              shortIds: [$nodes[].shortId]
             }
           }
         }
@@ -1843,7 +1873,7 @@ render_config() {
             ]
           + [{
               type: "field",
-              inboundTag: ["vless-in"],
+              inboundTag: [$port_groups[] | inbound_tag(.[0].inboundPort // $s.inboundPort)],
               outboundTag: "blocked"
             }]
         )
@@ -1873,7 +1903,8 @@ canonical_state_identity() {
   jq -cS '
     def normalized_enabled:
       if has("enabled") then .enabled else true end;
-    if (.schema // 1) == 2 then
+    . as $state
+    | if (.schema // 1) == 2 then
       {
         serverAddress,
         inboundPort,
@@ -1888,6 +1919,7 @@ canonical_state_identity() {
               number,
               name,
               email,
+              inboundPort: (.inboundPort // $state.inboundPort),
               uuid,
               shortId,
               spiderX,
@@ -1915,6 +1947,7 @@ canonical_state_identity() {
             number: 1,
             name: ($old.nodeName // "PuppyIP-1"),
             email: "node-1@puppyip.local",
+            inboundPort: $old.inboundPort,
             uuid: $old.uuid,
             shortId: $old.shortId,
             spiderX: "/",
@@ -1978,11 +2011,14 @@ canonical_runtime_identity() {
       (($s.schema // 1) == 2) as $schema2
     | (if $schema2 then 2 else 1 end) as $schema
     | (normalized_nodes($s)) as $nodes
-    | ([ $c.inbounds[]? | select(.tag == "vless-in") ][0] // {}) as $inbound
     | ([ $nodes[] | outbound_tag($schema; .) ]) as $expected_outbound_tags
     | {
-        inbound: {
-          matchCount: ([ $c.inbounds[]? | select(.tag == "vless-in") ] | length),
+        inbounds: ([
+          $c.inbounds[]?
+          | select((.tag // "") | test("^vless-in(-[0-9]+)?$"))
+          | . as $inbound
+          | {
+          tag: $inbound.tag,
           listen: ($inbound.listen // ""),
           port: ($inbound.port // null),
           protocol: ($inbound.protocol // ""),
@@ -1996,7 +2032,7 @@ canonical_runtime_identity() {
           serverNames: (($inbound.streamSettings.realitySettings.serverNames // []) | sort),
           privateKey: ($inbound.streamSettings.realitySettings.privateKey // ""),
           shortIds: (($inbound.streamSettings.realitySettings.shortIds // []) | sort)
-        },
+        }] | sort_by(.port, .tag)),
         nodeOutbounds: ([
           $nodes[] as $node
           | (outbound_tag($schema; $node)) as $tag
@@ -2012,7 +2048,7 @@ canonical_runtime_identity() {
             }
         ] | sort_by(.id)),
         extraInbounds: ([
-          $c.inbounds[]? | select((.tag // "") != "vless-in")
+          $c.inbounds[]? | select(((.tag // "") | test("^vless-in(-[0-9]+)?$")) | not)
         ] | sort_by(.tag // "")),
         extraOutbounds: ([
           $c.outbounds[]?
@@ -2026,9 +2062,10 @@ canonical_runtime_identity() {
 config_reality_private_key() {
   local config_file="$1"
   jq -er '
-    .inbounds[]
-    | select(.tag == "vless-in")
-    | .streamSettings.realitySettings.privateKey
+    [.inbounds[]
+     | select((.tag // "") | test("^vless-in(-[0-9]+)?$"))
+     | .streamSettings.realitySettings.privateKey] | unique
+    | select(length == 1 and (.[0] | type == "string" and length > 0)) | .[0]
   ' "$config_file"
 }
 
@@ -2380,6 +2417,8 @@ deploy_full() {
 
 deploy_model_change() {
   local work_dir="$1" version="$2" backup_path manager_ready='no'
+  local preview_file='' previous_int_trap
+  shift 2
   render_state "${work_dir}/candidate-state.json" "$version"
   assert_model_port_available "${work_dir}/candidate-state.json"
   render_config "${work_dir}/candidate-config.json" "$work_dir" \
@@ -2389,6 +2428,10 @@ deploy_model_change() {
     die "无法取得并校验安装脚本的固定提交副本，未部署任何服务文件；请稍后重试。"
   fi
   manager_ready='yes'
+  if (( $# > 0 )); then
+    preview_file="${work_dir}/new-connections.txt"
+    prepare_connection_preview "${work_dir}/candidate-state.json" "$preview_file" "$@"
+  fi
   ensure_runtime_layout
   if ! backup_path="$(create_backup)"; then
     cleanup_runtime_layout_created_this_run
@@ -2404,6 +2447,21 @@ deploy_model_change() {
       || ! atomic_install "${work_dir}/manager" "$LEGACY_MANAGER_BIN" 0755 root root; then
       rollback_backup "$backup_path"
       die "管理命令更新失败，已回滚。"
+    fi
+  fi
+  if [[ -n "$preview_file" ]]; then
+    previous_int_trap="$(trap -p INT)"
+    trap 'trap "" INT; rollback_backup "$backup_path"; warn "操作已取消，节点修改已回滚。"; exit 130' INT
+    if ! cat -- "$preview_file"; then
+      rollback_backup "$backup_path"
+      die "节点链接显示失败，节点修改已回滚。"
+    fi
+    # Allow terminal output to travel before restarting its possible proxy path.
+    if [[ -t 1 ]]; then sleep 2; fi
+    if [[ -n "$previous_int_trap" ]]; then
+      eval "$previous_int_trap"
+    else
+      trap - INT
     fi
   fi
   if ! systemctl restart "$SERVICE_NAME" >/dev/null 2>&1; then
@@ -2432,6 +2490,7 @@ build_share_link() {
   if [[ "$schema" == '2' ]]; then
     select_node_id "$STATE_FILE" "$selector"
     node_json="$(jq -cer --arg id "$SELECTED_NODE_ID" '.nodes[] | select(.id == $id)' "$STATE_FILE")"
+    port="$(jq -r --argjson default_port "$port" '.inboundPort // $default_port' <<<"$node_json")"
     uuid="$(jq -r '.uuid' <<<"$node_json")"
     public_key="$(jq -er '.realityPublicKey' "$STATE_FILE")"
     short_id="$(jq -r '.shortId' <<<"$node_json")"
@@ -2459,15 +2518,15 @@ print_node_list_file() {
   printf '\n%s已配置节点%s\n' "$C_BOLD" "$C_RESET"
   if [[ "$schema" == '2' ]]; then
     jq -r '
-      .nodes[] |
-      if (.type // "socks") == "direct" then
+      .inboundPort as $default_port | .nodes[] |
+      (if (.type // "socks") == "direct" then
         "  \(.number)) \(.name)\n     状态：\(if .enabled == false then "已暂停（原链接已保留）" else "已启用" end)\n     出口：VPS 本机直连 · 公网 IPv4：\(.exitIp)"
       else
         "  \(.number)) \(.name)\n     状态：\(if .enabled == false then "已暂停（原链接已保留）" else "已启用" end)\n     SOCKS5：\(.socksHost):\(.socksPort) · 实际出口：\(if .exitIp == "" then "未验证" else .exitIp end)"
-      end
+      end) + "\n     入口端口：\(.inboundPort // $default_port)/tcp"
     ' "$file"
   else
-    jq -r '"  1) \(.nodeName)\n     状态：已启用\n     SOCKS5：\(.socksHost):\(.socksPort) · 实际出口：旧版未记录"' "$file"
+    jq -r '"  1) \(.nodeName)\n     状态：已启用\n     SOCKS5：\(.socksHost):\(.socksPort) · 实际出口：旧版未记录\n     入口端口：\(.inboundPort)/tcp"' "$file"
   fi
 }
 
@@ -2528,6 +2587,7 @@ node_enabled() {
 
 show_connection() {
   local selector="${1:-}" footer="${2:-yes}" link node_id outbound_type exit_ip enabled schema
+  local qr_mode="${3:-auto}"
   select_node_id "$STATE_FILE" "$selector"
   node_id="$SELECTED_NODE_ID"
   link="$(build_share_link "$node_id")"
@@ -2549,7 +2609,8 @@ show_connection() {
       "$C_YELLOW" "$C_RESET"
   fi
   printf '%s\n\n' "$link"
-  if command -v qrencode >/dev/null 2>&1 && [[ -t 1 ]]; then
+  if command -v qrencode >/dev/null 2>&1 \
+    && [[ "$qr_mode" == 'yes' || ( "$qr_mode" == 'auto' && -t 1 ) ]]; then
     qrencode -t ANSIUTF8 "$link" || true
   fi
   if [[ "$outbound_type" == 'direct' ]]; then
@@ -2585,17 +2646,39 @@ show_connections_by_id() {
   show_brand_footer
 }
 
+prepare_connection_preview() (
+  local candidate_state="$1" output="$2" qr_mode='no' node_id
+  shift 2
+  [[ ! -t 1 ]] || qr_mode='yes'
+  # Render before changing installed files; retain the original terminal's QR mode.
+  STATE_FILE="$candidate_state"
+  {
+    info "节点配置已保存，当前待生效；以下链接将在重启成功后可用。"
+    for node_id in "$@"; do
+      show_connection "$node_id" no "$qr_mode"
+    done
+    show_brand_footer
+    warn "即将重启 PuppyIP 服务；若 SSH 经过这台 VPS 的代理，连接可能中断。" 2>&1
+    info "重连后可输入 puppyip show all 再次查看链接和二维码。"
+  } >"$output"
+)
+
 print_firewall_hint() {
   local port
-  port="$(state_value '.inboundPort' '')"
-  [[ -n "$port" ]] || return 0
-  if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q '^Status: active'; then
-    warn "UFW 正在运行。如尚未放行，请执行：ufw allow ${port}/tcp"
+  local -a ports=("$@")
+  if (( ${#ports[@]} == 0 )); then
+    [[ -r "$STATE_FILE" ]] || return 0
+    mapfile -t ports < <(model_inbound_ports "$STATE_FILE")
   fi
-  if command -v firewall-cmd >/dev/null 2>&1 && firewall-cmd --state >/dev/null 2>&1; then
-    warn "firewalld 正在运行。如尚未放行，请执行：firewall-cmd --permanent --add-port=${port}/tcp && firewall-cmd --reload"
-  fi
-  warn "还要在云厂商安全组中放行 ${port}/tcp（脚本不会自动修改防火墙）。"
+  for port in "${ports[@]}"; do
+    if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q '^Status: active'; then
+      warn "UFW 正在运行。如尚未放行，请执行：ufw allow ${port}/tcp"
+    fi
+    if command -v firewall-cmd >/dev/null 2>&1 && firewall-cmd --state >/dev/null 2>&1; then
+      warn "firewalld 正在运行。如尚未放行，请执行：firewall-cmd --permanent --add-port=${port}/tcp && firewall-cmd --reload"
+    fi
+    warn "还要在云厂商安全组中放行 ${port}/tcp（脚本不会自动修改防火墙）。"
+  done
 }
 
 script_version_from_file() {
@@ -2799,7 +2882,8 @@ command_show() {
 }
 
 command_add() {
-  local show_hint="${1:-yes}" work_dir version
+  local show_hint="${1:-yes}" work_dir version node_id
+  local -a new_ports=()
   refresh_brand_banner
   require_root
   check_platform
@@ -2810,12 +2894,52 @@ command_add() {
   prepare_existing_operation "$work_dir"
   version="$(jq -er '.xrayVersion' "$MODEL_FILE")"
   append_batch_nodes_to_model "${work_dir}/xray/xray"
+  for node_id in "${NEW_NODE_IDS[@]}"; do
+    new_ports+=("$(jq -er --arg id "$node_id" '. as $s | .nodes[]
+      | select(.id == $id) | (.inboundPort // $s.inboundPort)' "$MODEL_FILE")")
+  done
+  print_firewall_hint "${new_ports[@]}"
   info "正在校验并统一应用 ${#NEW_NODE_IDS[@]} 个新节点..."
-  deploy_model_change "$work_dir" "$version"
+  deploy_model_change "$work_dir" "$version" "${NEW_NODE_IDS[@]}"
   refresh_brand_banner
   info "已添加 ${#NEW_NODE_IDS[@]} 个出口。"
-  show_connections_by_id "${NEW_NODE_IDS[@]}"
   [[ "$show_hint" != 'yes' ]] || show_management_hint
+}
+
+command_port() {
+  local selector="${1:-}" work_dir version old_port new_port node_id node_name
+  local XRAY_CHAIN_PORT=''
+  local -a reserved_ports=()
+  (( $# <= 1 )) || die "用法：puppyip port [节点编号]，一次只更换一条节点的入口端口。"
+  refresh_brand_banner
+  require_root
+  check_platform
+  require_systemd
+  acquire_lock
+  new_temp_dir
+  work_dir="$LAST_TEMP_DIR"
+  prepare_existing_operation "$work_dir"
+  select_node_id "$MODEL_FILE" "$selector"
+  node_id="$SELECTED_NODE_ID"
+  version="$(jq -er '.xrayVersion' "$MODEL_FILE")"
+  old_port="$(jq -er --arg id "$node_id" '. as $s | .nodes[]
+    | select(.id == $id) | (.inboundPort // $s.inboundPort)' "$MODEL_FILE")"
+  node_name="$(jq -er --arg id "$node_id" '.nodes[] | select(.id == $id) | .name' "$MODEL_FILE")"
+  mapfile -t reserved_ports < <(jq -r '. as $s
+    | [.inboundPort, (.nodes[] | (.inboundPort // $s.inboundPort))] | unique[]' "$MODEL_FILE")
+  select_inbound_port "${reserved_ports[@]}"
+  new_port="$INBOUND_PORT"
+  jq --arg id "$node_id" --argjson port "$new_port" \
+    '(.nodes[] | select(.id == $id) | .inboundPort) = $port' "$MODEL_FILE" >"${MODEL_FILE}.new"
+  mv -f -- "${MODEL_FILE}.new" "$MODEL_FILE"
+  validate_model "$MODEL_FILE"
+  info "节点 ${node_name} · 入口端口：${old_port} → ${new_port}"
+  warn "请更新这条节点在客户端中的端口，或重新导入下面的新链接。"
+  print_firewall_hint "$new_port"
+  info "正在校验并应用新端口..."
+  deploy_model_change "$work_dir" "$version" "$node_id"
+  info "入口端口已从 ${old_port} 更换为 ${new_port}；请更新客户端连接。"
+  show_management_hint
 }
 
 command_edit() {
@@ -2973,11 +3097,13 @@ status_state_is_valid() {
   if [[ "$schema" == '2' ]]; then
     jq -e '
       .schema == 2
-      and (.inboundPort | type == "number" and . >= 1 and . <= 65535)
+      and (.inboundPort | type == "number" and floor == . and . >= 1 and . <= 65535)
       and (.nodes | type == "array" and length > 0)
       and all(.nodes[];
         (.id | type == "string" and test("^node-[1-9][0-9]*$"))
         and (.number | type == "number" and floor == . and . >= 1)
+        and ((has("inboundPort") | not)
+          or (.inboundPort | type == "number" and floor == . and . >= 1 and . <= 65535))
         and (.name | type == "string" and length > 0)
         and ((has("enabled") | not) or (.enabled | type == "boolean"))
         and ((.type // "socks") == "socks" or (.type // "socks") == "direct")
@@ -2995,7 +3121,7 @@ status_state_is_valid() {
   elif [[ "$schema" == '1' ]]; then
     jq -e '
       ((.schema // 1) == 1)
-      and (.inboundPort | type == "number" and . >= 1 and . <= 65535)
+      and (.inboundPort | type == "number" and floor == . and . >= 1 and . <= 65535)
       and (.nodeName | type == "string" and length > 0)
       and (.socksHost | type == "string" and length > 0)
       and (.socksPort | type == "number" and . >= 1 and . <= 65535)
@@ -3094,9 +3220,10 @@ probe_status_node() {
 
 show_status_node_health() {
   local schema="$1" work_dir="$2" unavailable_reason="${3:-}"
-  local node_id pid completed=0 total_enabled=0 status detected_ip expected_ip
+  local node_id node_port pid completed=0 total_enabled=0 status detected_ip expected_ip
   local -a node_ids=() running_pids=() result_lines=()
   local -A numbers=() names=() types=() enabled=() expected=() result_files=()
+  local -A ports=() port_ready=()
 
   if [[ "$schema" == '2' ]]; then
     mapfile -t node_ids < <(jq -r '.nodes | sort_by(.number)[] | .id' "$STATE_FILE")
@@ -3112,6 +3239,8 @@ show_status_node_health() {
         "$STATE_FILE")"
       expected[$node_id]="$(jq -r --arg id "$node_id" \
         '.nodes[] | select(.id == $id) | (.exitIp // "")' "$STATE_FILE")"
+      ports[$node_id]="$(jq -er --arg id "$node_id" \
+        '. as $state | .nodes[] | select(.id == $id) | (.inboundPort // $state.inboundPort)' "$STATE_FILE")"
     done
   else
     node_ids=('node-1')
@@ -3120,12 +3249,14 @@ show_status_node_health() {
     types['node-1']='socks'
     enabled['node-1']='true'
     expected['node-1']=''
+    ports['node-1']="$(jq -er '.inboundPort' "$STATE_FILE")"
   fi
 
   printf '\n%s线路出口检测（实时）%s\n' "$C_BOLD" "$C_RESET"
   if [[ -n "$unavailable_reason" ]]; then
     for node_id in "${node_ids[@]}"; do
       printf '  %s) %s\n' "${numbers[$node_id]}" "${names[$node_id]}"
+      printf '     入口：%s/tcp\n' "${ports[$node_id]}"
       if [[ "${enabled[$node_id]}" == 'false' ]]; then
         printf '     状态：已暂停（未检测）\n'
       else
@@ -3137,6 +3268,15 @@ show_status_node_health() {
 
   for node_id in "${node_ids[@]}"; do
     [[ "${enabled[$node_id]}" == 'true' ]] || continue
+    node_port="${ports[$node_id]}"
+    if [[ -z "${port_ready[$node_port]:-}" ]]; then
+      if status_tcp_port_is_listening "$node_port"; then
+        port_ready[$node_port]='yes'
+      else
+        port_ready[$node_port]='no'
+      fi
+    fi
+    [[ "${port_ready[$node_port]}" == 'yes' ]] || continue
     total_enabled=$((total_enabled + 1))
     result_files[$node_id]="${work_dir}/status-${node_id}.result"
   done
@@ -3149,6 +3289,7 @@ show_status_node_health() {
     fi
     for node_id in "${node_ids[@]}"; do
       [[ "${enabled[$node_id]}" == 'true' ]] || continue
+      [[ "${port_ready[${ports[$node_id]}]}" == 'yes' ]] || continue
       probe_status_node "$node_id" "${types[$node_id]}" "$schema" "$work_dir" \
         "${result_files[$node_id]}" &
       running_pids+=("$!")
@@ -3173,8 +3314,13 @@ show_status_node_health() {
 
   for node_id in "${node_ids[@]}"; do
     printf '  %s) %s\n' "${numbers[$node_id]}" "${names[$node_id]}"
+    printf '     入口：%s/tcp\n' "${ports[$node_id]}"
     if [[ "${enabled[$node_id]}" == 'false' ]]; then
       printf '     状态：已暂停（未检测）\n'
+      continue
+    fi
+    if [[ "${port_ready[${ports[$node_id]}]}" != 'yes' ]]; then
+      printf '     状态：不可用（入口端口未监听）\n'
       continue
     fi
     result_lines=()
@@ -3200,8 +3346,9 @@ show_status_node_health() {
 
 command_status() {
   local version_output node_count enabled_count paused_count port service_state service_label
-  local validation_log tcp_cc default_qdisc schema config_valid='no' port_listening='no'
-  local unavailable_reason='' work_dir entry_label
+  local validation_log tcp_cc default_qdisc schema config_valid='no'
+  local unavailable_reason='' work_dir entry_label=''
+  local -a ports=()
   require_root
   [[ -x "$XRAY_BIN" && -r "$CONFIG_FILE" && -r "$STATE_FILE" ]] || die "PuppyIP Chain 尚未安装。"
   if ! version_output="$($XRAY_BIN version 2>/dev/null)"; then
@@ -3219,13 +3366,15 @@ command_status() {
     enabled_count='1'
   fi
   paused_count="$((node_count - enabled_count))"
-  port="$(jq -r '.inboundPort' "$STATE_FILE")"
-  if status_tcp_port_is_listening "$port"; then
-    port_listening='yes'
-    entry_label="${port}/tcp（监听中）"
-  else
-    entry_label="${port}/tcp（未监听）"
-  fi
+  mapfile -t ports < <(model_inbound_ports "$STATE_FILE")
+  for port in "${ports[@]}"; do
+    [[ -z "$entry_label" ]] || entry_label+='、'
+    if status_tcp_port_is_listening "$port"; then
+      entry_label+="${port}/tcp（监听中）"
+    else
+      entry_label+="${port}/tcp（未监听）"
+    fi
+  done
   service_state="$(systemctl is-active "$SERVICE_NAME" 2>/dev/null || true)"
   if [[ "$service_state" == 'active' ]]; then
     service_label='正常'
@@ -3253,8 +3402,6 @@ command_status() {
   fi
   if [[ "$service_state" != 'active' ]]; then
     unavailable_reason='服务未运行'
-  elif [[ "$port_listening" != 'yes' ]]; then
-    unavailable_reason='入口端口未监听'
   elif [[ "$config_valid" != 'yes' ]]; then
     unavailable_reason='配置校验失败'
   fi
@@ -3354,15 +3501,16 @@ show_menu() {
   printf '\n%sPuppyIP Chain 简易管理%s · 共 %s 条线路，%s 条启用\n' \
     "$C_BOLD" "$C_RESET" "$node_count" "$enabled_count"
   printf '  1) 新增本机直连或批量 SOCKS5 出口\n'
-  printf '  2) 查看线路、链接和二维码\n'
-  printf '  3) 更换线路的出口 IP\n'
-  printf '  4) 暂停或启用线路\n'
-  printf '  5) 删除线路\n'
-  printf '  6) 重新生成线路链接（旧链接会失效）\n'
-  printf '  7) 检查是否正常运行\n'
-  printf '  8) 查看运行日志\n'
-  printf '  9) 更新 Xray 程序\n'
-  printf ' 10) 卸载 PuppyIP Chain\n'
+  printf '  2) 更换指定线路的入口端口（随机）\n'
+  printf '  3) 查看线路、链接和二维码\n'
+  printf '  4) 更换线路的出口 IP\n'
+  printf '  5) 暂停或启用线路\n'
+  printf '  6) 删除线路\n'
+  printf '  7) 重新生成线路链接（旧链接会失效）\n'
+  printf '  8) 检查是否正常运行\n'
+  printf '  9) 查看运行日志\n'
+  printf ' 10) 更新 Xray 程序\n'
+  printf ' 11) 卸载 PuppyIP Chain\n'
   printf '  0) 退出\n'
 }
 
@@ -3387,6 +3535,7 @@ usage() {
   sudo puppyip resume [节点编号]       启用节点并恢复原链接
   sudo puppyip remove [节点编号]       删除节点
   sudo puppyip reset [节点编号]        重置节点凭据
+  sudo puppyip port [节点编号]         随机更换指定节点的入口端口
   sudo puppyip upgrade                 原地迁移并更新管理脚本
   sudo puppyip update                  更新 Xray-core 并安全迁移状态
   sudo puppyip status|logs
@@ -3398,7 +3547,7 @@ usage() {
   XRAY_VERSION=v26.3.27              指定 Xray-core 版本；update 默认获取 latest
   XRAY_CHAIN_REALITY_TARGET=域名:443 自定义 REALITY 目标
   XRAY_CHAIN_REALITY_SNI=域名        自定义 REALITY SNI；默认与目标域名一致
-  XRAY_CHAIN_PORT=62001              明确指定单个入口端口；默认自动选择高位端口
+  XRAY_CHAIN_PORT=62001              指定首次安装的首节点端口；其余节点自动选择高位端口
   XRAY_CHAIN_UDP_MODE=block|proxy     新节点 UDP 策略；默认 proxy
   XRAY_CHAIN_ENABLE_BBR=1|0           自动启用 BBR；默认 1，设为 0 时不修改 TCP 参数
   XRAY_CHAIN_ALLOW_UNVERIFIED=1      非交互模式允许跳过失败的联网验证
@@ -3417,6 +3566,7 @@ main() {
   case "$command" in
     install) command_install ;;
     add) command_add ;;
+    port) shift; command_port "$@" ;;
     list) command_list ;;
     show) shift; command_show "${1:-}" ;;
     edit|reconfigure) shift; command_edit "${1:-}" ;;
@@ -3445,21 +3595,22 @@ main() {
       show_brand_banner
       while true; do
         show_menu
-        if ! read -r -p '请选择要做的操作 [0-10]: ' command; then
+        if ! read -r -p '请选择要做的操作 [0-11]: ' command; then
           printf '\n'
           exit 0
         fi
         case "$command" in
           1) command_add no; pause_menu ;;
-          2) command_show all; pause_menu ;;
-          3) command_edit; pause_menu ;;
-          4) command_toggle_enabled; pause_menu ;;
-          5) command_remove; pause_menu ;;
-          6) command_reset; pause_menu ;;
-          7) command_status; pause_menu ;;
-          8) command_logs; pause_menu ;;
-          9) command_update; pause_menu ;;
-          10)
+          2) command_port; pause_menu ;;
+          3) command_show all; pause_menu ;;
+          4) command_edit; pause_menu ;;
+          5) command_toggle_enabled; pause_menu ;;
+          6) command_remove; pause_menu ;;
+          7) command_reset; pause_menu ;;
+          8) command_status; pause_menu ;;
+          9) command_logs; pause_menu ;;
+          10) command_update; pause_menu ;;
+          11)
             command_uninstall
             if installation_complete; then pause_menu; else exit 0; fi
             ;;

@@ -6,6 +6,8 @@ SCRIPT="${ROOT_DIR}/install.sh"
 
 bash -n "$SCRIPT"
 bash -n "${ROOT_DIR}/tests/integration.sh"
+bash -n "${ROOT_DIR}/tests/add-preview.sh"
+bash -n "${ROOT_DIR}/tests/port-change.sh"
 [[ ! -f "${ROOT_DIR}/tests/preflight.sh" ]] || bash -n "${ROOT_DIR}/tests/preflight.sh"
 
 bash -c '
@@ -253,12 +255,16 @@ bash -c '
   [[ "$edit_promo_output" != *"支持批量"* ]]
   menu_output="$(show_menu)"
   [[ "$menu_output" == *"1) 新增本机直连或批量 SOCKS5 出口"* ]]
-  [[ "$menu_output" == *"2) 查看线路、链接和二维码"* ]]
-  [[ "$menu_output" == *"3) 更换线路的出口 IP"* ]]
-  [[ "$menu_output" == *"4) 暂停或启用线路"* ]]
-  [[ "$menu_output" == *"6) 重新生成线路链接（旧链接会失效）"* ]]
-  [[ "$menu_output" == *"7) 检查是否正常运行"* ]]
-  [[ "$menu_output" == *"10) 卸载 PuppyIP Chain"* ]]
+  grep -Eq "^[[:space:]]*2[)].*入口端口" <<<"$menu_output"
+  [[ "$menu_output" == *"3) 查看线路、链接和二维码"* ]]
+  [[ "$menu_output" == *"4) 更换线路的出口 IP"* ]]
+  [[ "$menu_output" == *"5) 暂停或启用线路"* ]]
+  [[ "$menu_output" == *"6) 删除线路"* ]]
+  [[ "$menu_output" == *"7) 重新生成线路链接（旧链接会失效）"* ]]
+  [[ "$menu_output" == *"8) 检查是否正常运行"* ]]
+  [[ "$menu_output" == *"9) 查看运行日志"* ]]
+  [[ "$menu_output" == *"10) 更新 Xray 程序"* ]]
+  [[ "$menu_output" == *"11) 卸载 PuppyIP Chain"* ]]
   original_script_source="$SCRIPT_SOURCE"
   SCRIPT_SOURCE="$MANAGER_BIN"
   running_as_installed_manager
@@ -446,6 +452,7 @@ JSON
 JSON
   status_output="$(
     interactive_progress_enabled() { return 1; }
+    status_tcp_port_is_listening() { return 0; }
     curl() {
       local config_path=""
       while (( $# > 0 )); do
@@ -478,6 +485,7 @@ JSON
 
   mismatch_output="$(
     interactive_progress_enabled() { return 1; }
+    status_tcp_port_is_listening() { return 0; }
     curl() { printf "198.51.100.99\n"; }
     show_status_node_health 2 "$status_fixture_dir/mismatch" ""
   )"
@@ -486,6 +494,7 @@ JSON
 
   failed_output="$(
     interactive_progress_enabled() { return 1; }
+    status_tcp_port_is_listening() { return 0; }
     curl() { return 1; }
     show_status_node_health 2 "$status_fixture_dir/failed" ""
   )"
@@ -556,6 +565,76 @@ JSON
   [[ "$inactive_status_output" == *"服务：异常（inactive）"* ]]
   [[ "$inactive_status_output" == *"状态：不可用（服务未运行）"* ]]
   [[ ! -e "$status_fixture_dir/inactive-unexpected-curl" ]]
+
+  mixed_ports_output="$(
+    STATE_FILE="$status_fixture_dir/mixed-state.json"
+    jq ".nodes[0].inboundPort = 62006 | .nodes += [.nodes[0] + {id:\"node-3\", number:3, name:\"Missing entry\", inboundPort:62007}]" \
+      "$fixture_dir/state.json" >"$STATE_FILE"
+    require_root() { :; }
+    status_tcp_port_is_listening() { [[ "$1" == "62006" ]]; }
+    systemctl() { printf "active\n"; }
+    read_sysctl_value() { printf "unknown"; }
+    interactive_progress_enabled() { return 1; }
+    probe_status_node() {
+      printf "%s\n" "$1" >>"$status_fixture_dir/mixed-probed-nodes"
+      write_status_probe_result "$5" ok "203.0.113.10"
+    }
+    command_status
+  )"
+  [[ "$mixed_ports_output" == *"62006/tcp（监听中）"* \
+    && "$mixed_ports_output" == *"62007/tcp（未监听）"* ]] || {
+    printf "状态检查没有分别显示节点入口端口。\n" >&2
+    exit 1
+  }
+  [[ "$mixed_ports_output" == *"出口 IP：203.0.113.10 · 正常"* ]]
+  [[ "$(grep -Fc "状态：不可用（入口端口未监听）" <<<"$mixed_ports_output")" == "1" ]]
+  [[ "$mixed_ports_output" == *"状态：已暂停（未检测）"* ]]
+  [[ "$(<"$status_fixture_dir/mixed-probed-nodes")" == "node-1" ]]
+
+  moved_ports_output="$(
+    STATE_FILE="$status_fixture_dir/moved-state.json"
+    jq ".nodes |= map(.inboundPort = 62006)" "$fixture_dir/state.json" >"$STATE_FILE"
+    require_root() { :; }
+    status_tcp_port_is_listening() { [[ "$1" == "62006" ]]; }
+    systemctl() { printf "active\n"; }
+    read_sysctl_value() { printf "unknown"; }
+    interactive_progress_enabled() { return 1; }
+    probe_status_node() { write_status_probe_result "$5" ok "203.0.113.10"; }
+    command_status
+  )"
+  [[ "$moved_ports_output" == *"入口：62006/tcp（监听中）"* ]]
+  [[ "$moved_ports_output" != *"443/tcp"* ]]
+  [[ "$moved_ports_output" == *"出口 IP：203.0.113.10 · 正常"* ]]
+
+  invalid_config_output="$(
+    STATE_FILE="$status_fixture_dir/moved-state.json"
+    XRAY_BIN="$status_fixture_dir/invalid-config-xray"
+    printf "%s\n" "#!/usr/bin/env bash" \
+      "[[ \"\${1:-}\" == \"version\" ]] && { printf \"Xray fixture\\n\"; exit 0; }; exit 1" >"$XRAY_BIN"
+    chmod 0755 "$XRAY_BIN"
+    require_root() { :; }
+    status_tcp_port_is_listening() { return 0; }
+    systemctl() { printf "active\n"; }
+    read_sysctl_value() { printf "unknown"; }
+    interactive_progress_enabled() { return 1; }
+    probe_status_node() { printf "unexpected" >"$status_fixture_dir/invalid-config-probe"; }
+    command_status
+  )"
+  [[ "$invalid_config_output" == *"状态：不可用（配置校验失败）"* ]]
+  [[ ! -e "$status_fixture_dir/invalid-config-probe" ]]
+
+  (
+    STATE_FILE="$status_fixture_dir/port-validation-state.json"
+    for invalid_node_port in 0 65536 1.5 null "\"62006\""; do
+      jq ".nodes[0].inboundPort = $invalid_node_port" "$fixture_dir/state.json" >"$STATE_FILE"
+      if status_state_is_valid 2; then
+        printf "状态检查错误接受节点端口：%s\n" "$invalid_node_port" >&2
+        exit 1
+      fi
+    done
+    jq ".nodes[0].inboundPort = 62006" "$fixture_dir/state.json" >"$STATE_FILE"
+    status_state_is_valid 2
+  )
   XRAY_BIN="$original_xray_bin"
   ASSET_DIR="$original_asset_dir"
   CONFIG_FILE="$original_config_file"
@@ -677,7 +756,7 @@ JSON
   grep -Fqx "SCRIPT_VERSION=\"${SCRIPT_VERSION}\"" "$remote_manager"
   [[ -x "$remote_manager" ]]
   [[ "$MOCK_MANAGER_URL" == \
-    "https://raw.githubusercontent.com/feng9254/xray-chain-installer/0123456789abcdef0123456789abcdef01234567/install.sh" ]]
+    "https://raw.githubusercontent.com/longdog123/xray-chain-installer/0123456789abcdef0123456789abcdef01234567/install.sh" ]]
   unset -f curl
   SCRIPT_SOURCE="$original_script_source"
   bbr_test_dir="$fixture_dir/bbr"
@@ -801,7 +880,7 @@ for required in \
   'direct-out-' \
   'AUTO_PORT_MIN=62001' \
   'AUTO_PORT_MAX=65534' \
-  'INSTALLER_RAW_URL="https://raw.githubusercontent.com/feng9254/xray-chain-installer/main/install.sh"' \
+  'INSTALLER_RAW_URL="https://raw.githubusercontent.com/longdog123/xray-chain-installer/main/install.sh"' \
   'INSTALLER_API_URL="https://api.github.com/repos/${INSTALLER_REPOSITORY}"' \
   '/git/ref/heads/${INSTALLER_BRANCH}' \
   'source_url="${INSTALLER_RAW_BASE}/${commit}/install.sh"' \
@@ -816,7 +895,7 @@ for required in \
   "json_extract(options, '\$.listen_port')" \
   'socks-out-' \
   'user: [.email]' \
-  'inboundTag: ["vless-in"]' \
+  'inboundTag:' \
   'nextNodeNumber' \
   'schema: 2' \
   'CURRENT_STATE_SCHEMA=2' \
@@ -851,7 +930,7 @@ if grep -Fq '请输入 UNINSTALL 确认' "$SCRIPT"; then
   exit 1
 fi
 
-if grep -Fq '10) command_uninstall; exit 0 ;;' "$SCRIPT"; then
+if grep -Eq '[0-9]+[)] command_uninstall; exit 0 ;;' "$SCRIPT"; then
   printf '取消卸载后不应直接退出管理菜单。\n' >&2
   exit 1
 fi
@@ -886,7 +965,8 @@ fi
 if command -v shellcheck >/dev/null 2>&1; then
   shellcheck "$SCRIPT" "${ROOT_DIR}/tests/static.sh" \
     "${ROOT_DIR}/tests/integration.sh" "${ROOT_DIR}/tests/preflight.sh" \
-    "${ROOT_DIR}/tests/rollback.sh"
+    "${ROOT_DIR}/tests/rollback.sh" "${ROOT_DIR}/tests/add-preview.sh" \
+    "${ROOT_DIR}/tests/port-change.sh"
 fi
 
 printf '静态检查通过。\n'

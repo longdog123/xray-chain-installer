@@ -13,7 +13,7 @@ v2rayN / Shadowrocket
           │
           │ VLESS + REALITY + Vision + TCP
           ▼
-     你自己的 VPS（一个端口）
+     你自己的 VPS（新节点各用独立端口）
           │
           ├── PuppyIP-203.0.113.10 ── VPS 本机直连
           ├── PuppyIP-198.51.100.11 ── SOCKS5 A
@@ -21,14 +21,14 @@ v2rayN / Shadowrocket
           └── PuppyIP-198.51.100.13 ── SOCKS5 C
 ```
 
-每条 VLESS 链接只对应一个固定出口，可以是 VPS 本机公网 IP，也可以是一条 SOCKS5。多个节点共用同一个 VPS 监听端口和同一套 REALITY 密钥，不需要为每个出口再搭一个面板或占用一个新端口。
+每条 VLESS 链接只对应一个固定出口，可以是 VPS 本机公网 IP，也可以是一条 SOCKS5。新建节点各自使用独立的 VPS 入口端口，共用一套 REALITY 密钥和 PuppyIP 服务，无需为每个出口再搭一个面板。旧版已有节点保留原来的共用端口；可以通过菜单第 2 项逐条更换为独立端口。
 
 ## 一键安装
 
 使用 root 登录 VPS，然后执行：
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/feng9254/xray-chain-installer/main/install.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/longdog123/xray-chain-installer/main/install.sh)
 ```
 
 运行后按提示选择出口：直接回车会创建使用 VPS 本机公网 IP 的直连节点；粘贴一条 SOCKS5 会创建一个固定代理出口；一次粘贴多条则会批量创建多个独立节点。SOCKS5 格式为：
@@ -63,7 +63,7 @@ IP:端口:用户名:密码
 如果当前用户不是 root，可先下载再使用 sudo：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/feng9254/xray-chain-installer/main/install.sh -o /tmp/puppyip-install.sh
+curl -fsSL https://raw.githubusercontent.com/longdog123/xray-chain-installer/main/install.sh -o /tmp/puppyip-install.sh
 sudo bash /tmp/puppyip-install.sh install
 ```
 
@@ -83,15 +83,16 @@ puppyip
 
 ```text
 1) 新增本机直连或批量 SOCKS5 出口
-2) 查看线路、链接和二维码
-3) 更换线路的出口 IP
-4) 暂停或启用线路
-5) 删除线路
-6) 重新生成线路链接（旧链接会失效）
-7) 检查是否正常运行
-8) 查看运行日志
-9) 更新 Xray 程序
-10) 卸载 PuppyIP Chain
+2) 更换指定线路的入口端口（随机）
+3) 查看线路、链接和二维码
+4) 更换线路的出口 IP
+5) 暂停或启用线路
+6) 删除线路
+7) 重新生成线路链接（旧链接会失效）
+8) 检查是否正常运行
+9) 查看运行日志
+10) 更新 Xray 程序
+11) 卸载 PuppyIP Chain
 0) 退出
 ```
 
@@ -107,6 +108,8 @@ puppyip pause 2
 puppyip resume 2
 puppyip remove 2
 puppyip reset 2
+puppyip port
+puppyip port 2
 puppyip upgrade
 puppyip status
 puppyip logs
@@ -120,13 +123,13 @@ puppyip uninstall
 
 ### 实时状态检测
 
-选择菜单 `7` 或执行 `puppyip status` 时，脚本会先检查 PuppyIP 服务、入口 TCP 端口和当前 Xray 配置。三项均正常后，再让每条已启用线路通过自己的本机直连或 SOCKS5 出口访问公网 IP 检测站；只有实际取得有效 IPv4 时才显示“正常”。暂停线路显示“未检测”，出口超时或无法取得 IPv4 显示“检测失败”。
+选择菜单 `8` 或执行 `puppyip status` 时，脚本会先检查 PuppyIP 服务、各节点的入口 TCP 端口和当前 Xray 配置。服务和配置正常、对应节点入口正在监听时，再让这条已启用线路通过自己的本机直连或 SOCKS5 出口访问公网 IP 检测站；只有实际取得有效 IPv4 时才显示“正常”。某个入口未监听只影响对应节点的检测；暂停线路显示“未检测”，出口超时或无法取得 IPv4 显示“检测失败”。
 
 如果实时出口与安装时记录的 IP 不同，状态页会明确标记“与记录不一致”，同时显示本次检测 IP 和原记录 IP，不会把它标为“正常”，也不会自动改写节点。该检测只确认当时的 TCP 出口和服务配置可用，不承诺所有网站、UDP 或客户端所在网络都能访问。
 
 ### 暂停与启用线路
 
-选择菜单 `4` 后，脚本会列出线路及当前状态。暂停只会禁用选中的线路，不会删除它的 UUID、Short ID、SpiderX、备注、SOCKS5 设置、链接或二维码；再次启用后，客户端原链接可以继续使用，无需重新扫码。也可以直接执行：
+选择菜单 `5` 后，脚本会列出线路及当前状态。暂停只会禁用选中的线路，不会删除它的 UUID、Short ID、SpiderX、备注、SOCKS5 设置、链接或二维码；再次启用后，客户端原链接可以继续使用，无需重新扫码。也可以直接执行：
 
 ```bash
 puppyip pause 2
@@ -136,6 +139,22 @@ puppyip resume 2
 暂停时，该 VLESS 用户的所有流量会被明确路由到拒绝出口，不会使用它原来的本机直连或 SOCKS5 上游。原出站设置和密码仍留在本机受限权限的 Xray 配置中，以便无损恢复；其他线路继续按原出口工作。即使全部线路都暂停，Xray 服务和配置也会保持正常，之后仍可逐条启用。
 
 每次暂停或启用都会先生成候选配置、执行 Xray 校验、备份并安全应用。PuppyIP 自己的 Xray 服务会重启一次，因此其他线路已有连接可能短暂重连；不会停止或修改 x-ui、3x-ui、S-UI 及其服务。
+
+### 更换入口端口
+
+选择菜单 `2`，进入后按编号选择要更换的节点，即可只更换这一条的 VLESS 入口端口。列表会显示各节点的当前端口和出口信息。也可以直接指定编号：
+
+```bash
+puppyip port 2
+```
+
+不带编号执行 `puppyip port` 时，多节点安装会提示选择；只有一条节点时直接选中该节点。脚本从 `62001-65534` 中随机选择新端口，避开原端口、其他节点已保存的端口、常用端口、已有 TCP/UDP 监听，以及检测到的 x-ui/3x-ui、S-UI 配置端口。暂停节点和当前停止服务的已保存端口同样会预留。此命令始终随机选端口，不使用首次安装的 `XRAY_CHAIN_PORT` 环境变量；连续 128 次未选到空闲端口时会停止操作。
+
+切换只改变所选节点的入口端口，保留其 UUID、Short ID、SpiderX、REALITY 密钥、SOCKS5 地址、用户名密码、出口 IP 和启停状态。所选节点需要在客户端更新端口，或重新导入新链接；其他节点的端口和链接保持原样。旧版共用端口上的节点会逐条分离，升级本身不会强制迁移所有节点，也不会使现有链接失效。
+
+脚本会先提示旧端口、新端口和防火墙放行要求，校验并保存配置后显示所选节点的新链接和二维码，再重启一次 PuppyIP 服务。因为各节点仍由同一个服务运行，其他线路已有连接也可能短暂重连。部署失败时恢复原配置；在展示后的等待阶段按 Ctrl+C 也会回滚。
+
+请在 VPS 防火墙和云厂商安全组中放行新的 TCP 端口。脚本不会自动修改防火墙；选到空闲端口和服务启动成功仅说明本机配置可应用，不代表外部网络一定可达。
 
 ### VPS 本机直连
 
@@ -147,11 +166,11 @@ puppyip resume 2
 
 首次安装和 `puppyip add` 使用同一套批量输入方式：多条信息使用空格或换行分隔，每条仍保持完整的 `IP:端口:用户名:密码` 格式。SOCKS5 地址支持 IPv4 或域名，当前不接受 IPv6 字面量；用户名和密码不要包含空格或换行，密码中的冒号可以保留。
 
-脚本会先检查整批格式，再逐条测试实际出口 IP。所有节点准备好后只重载一次 Xray；中途取消或部署失败不会留下只添加了一部分的运行配置。添加成功后，所有新链接和二维码会依次直接显示。
+执行 `puppyip add` 新增时，脚本会先检查整批格式，再逐条测试实际出口 IP。配置校验并保存成功后，先依次显示所有新链接和二维码，注明“待生效”，然后统一重启一次 Xray。若管理服务器的 SSH 也经过这台 VPS 的 PuppyIP 代理，重启会中断该连接，因此链接会提前输出；重新连接后也可输入 `puppyip show all` 再次查看。新链接在重启成功后生效；部署失败时会回滚，提前显示的新链接也随之失效。
 
 ## 多出口如何工作
 
-- 一台 VPS 只运行一个 Xray 进程、一个 VLESS 入站和一个 TCP 端口。
+- 一台 VPS 运行一个 Xray 进程，按节点的入口端口生成对应的 VLESS 入站；新节点各用独立端口，旧版共用端口上的节点保留在原入站中。
 - 每个本机直连或 SOCKS5 出口对应独立的 UUID、Short ID、SpiderX、用户标识、出站和分享链接。
 - Xray 根据 VLESS 用户标识把流量精确路由到对应的 `freedom` 或 SOCKS5 出站。
 - 暂停线路只改变其启用状态；节点身份与分享链接保持不变，启用后继续使用原链接。
@@ -175,7 +194,7 @@ PuppyIP-198.51.100.23
 | 参数 | 生命周期 | 说明 |
 |---|---|---|
 | VPS 地址 | 整个安装固定 | 首次自动识别，所有节点共用 |
-| VLESS 端口 | 整个安装固定 | 首次从 `62001-65534` 随机选择空闲端口并保存；可显式指定 |
+| VLESS 端口 | 新节点各自独立，保存后保持 | 从 `62001-65534` 随机选择；可用 `puppyip port <编号>` 单独更换；旧版节点保留原端口 |
 | REALITY 目标 / SNI | 整个安装固定 | 默认 `www.bing.com:443`，不随机轮换 |
 | REALITY X25519 密钥 | 整个安装固定 | 首次安全生成；新增节点不会重置 |
 | UUID | 每个节点独立 | 新增时由 Xray 生成，保存后不变 |
@@ -200,19 +219,19 @@ PuppyIP-198.51.100.23
 
 IANA 将 `49152-65535` 定义为 Dynamic/Private 范围；这里进一步从 `62001` 开始，是为了高于 3x-ui 官方安装器当前随机面板端口范围的上限 `62000`。S-UI 官方默认面板和订阅端口 `2095/2096` 也自然位于范围外。
 
-选择前会通过 `ss` 检查当前 IPv4/IPv6 的 TCP 和 UDP 监听，配置部署前再检查一次。端口选定后会写入状态文件并长期复用，不会在新增节点时改变。如果检查后仍被其他进程抢占，Xray 启动会失败并触发回滚。
+新安装和新增节点时，每条节点都会获得独立入口端口，包括使用相同出口 IP 的不同节点。选择前会排除其他节点已保存的端口，并通过 `ss` 检查当前 IPv4/IPv6 的 TCP 和 UDP 监听，配置部署前再检查一次。端口选定后写入节点状态并长期复用；新增节点不改变已有节点的端口。旧版共用端口保持兼容，只有主动执行 `puppyip port <编号>` 才会更换所选节点的端口。如果检查后仍被其他进程抢占，Xray 启动会失败并触发回滚。
 
 专家用户确实需要指定端口时，可以使用：
 
 ```bash
-XRAY_CHAIN_PORT=443 bash <(curl -fsSL https://raw.githubusercontent.com/feng9254/xray-chain-installer/main/install.sh)
+XRAY_CHAIN_PORT=443 bash <(curl -fsSL https://raw.githubusercontent.com/longdog123/xray-chain-installer/main/install.sh)
 ```
 
-显式端口必须是 `1-65535` 的单个整数。常用端口会显示警告；已经被 TCP 或 UDP 服务监听时会直接拒绝，不会静默换成其他端口。`433` 不是 HTTPS 标准端口，但自动范围同样不会选择它。
+显式端口必须是 `1-65535` 的单个整数，只用于首次安装的第一条节点，其余新节点仍会自动选择独立高位端口。常用端口会显示警告；已经被 TCP 或 UDP 服务监听时会直接拒绝，不会静默换成其他端口。`433` 不是 HTTPS 标准端口，但自动范围同样不会选择它。
 
 Xray-core 可能对非 `443` 的 REALITY 监听输出风险提示。本项目默认优先避免与网站、证书服务和已有面板争用 `443`；如果你的网络环境确实需要 `443`，应先确认 Nginx、Caddy、面板入站及其他 Xray 都没有使用它，再通过 `XRAY_CHAIN_PORT=443` 明确指定。
 
-脚本不会自动修改 UFW、firewalld 或云厂商安全组，安装结束会提示需要放行最终选中的 TCP 端口。
+脚本不会自动修改 UFW、firewalld 或云厂商安全组。安装、新增或换端口时会提示各节点需要放行的 TCP 端口。
 
 ## 与 x-ui、3x-ui、S-UI 或独立 Xray 共存
 
@@ -284,7 +303,7 @@ XRAY_CHAIN_UDP_MODE=block puppyip add
 旧版用户不需要卸载，也不需要重新搭节点。再次执行同一条一键命令：
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/feng9254/xray-chain-installer/main/install.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/longdog123/xray-chain-installer/main/install.sh)
 ```
 
 脚本检测到旧版本后会使用 `[y=同意 / n=不同意 / 回车=同意]` 询问是否更新；成功更新后直接进入新增 SOCKS5 的输入步骤。已经是当前版本时会跳过更新并直接进入新增步骤。取消更新时不会修改节点，并提示输入 `puppyip` 打开管理菜单。更新前会把旧状态迁移为当前 schema，再逐项核对以下不变量：
@@ -315,13 +334,13 @@ net.core.default_qdisc = fq
 明确在命令末尾添加 `install` 也会执行原地版本检查与安全迁移，不会进入新增节点流程：
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/feng9254/xray-chain-installer/main/install.sh) install
+bash <(curl -fsSL https://raw.githubusercontent.com/longdog123/xray-chain-installer/main/install.sh) install
 ```
 
 如果服务器原本已经使用 BBR，脚本会保留现有设置而不接管。如果内核不提供 BBR、容器或云厂商禁止修改 sysctl，脚本只会显示警告，节点安装仍会继续。需要明确禁止脚本修改 TCP 参数时：
 
 ```bash
-XRAY_CHAIN_ENABLE_BBR=0 bash <(curl -fsSL https://raw.githubusercontent.com/feng9254/xray-chain-installer/main/install.sh) install
+XRAY_CHAIN_ENABLE_BBR=0 bash <(curl -fsSL https://raw.githubusercontent.com/longdog123/xray-chain-installer/main/install.sh) install
 ```
 
 脚本只使用系统内核已经提供的 BBR，不安装第三方内核。由脚本启用的设置会在卸载时恢复到安装前的值。BBR 可能改善高延迟或丢包链路上的 TCP 吞吐，但无法修复上游 SOCKS5 本身限速、丢包、封禁目标网站或 UDP 不可用。
@@ -363,7 +382,7 @@ XRAY_CHAIN_ENABLE_BBR=0 bash <(curl -fsSL https://raw.githubusercontent.com/feng
 需要安装指定核心版本时：
 
 ```bash
-XRAY_VERSION=v26.3.27 bash <(curl -fsSL https://raw.githubusercontent.com/feng9254/xray-chain-installer/main/install.sh)
+XRAY_VERSION=v26.3.27 bash <(curl -fsSL https://raw.githubusercontent.com/longdog123/xray-chain-installer/main/install.sh)
 ```
 
 ## 旧版自动迁移
