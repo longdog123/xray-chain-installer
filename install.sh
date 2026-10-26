@@ -5,7 +5,7 @@
 set -Eeuo pipefail
 umask 077
 
-SCRIPT_VERSION="0.2.18"
+SCRIPT_VERSION="0.2.19"
 CURRENT_STATE_SCHEMA=2
 SERVICE_NAME="xray-chain.service"
 RUNTIME_USER="xray-chain"
@@ -354,7 +354,7 @@ trap cleanup EXIT
 new_temp_dir() {
   local path temp_base='/var/tmp'
   [[ -d "$temp_base" ]] || temp_base='/tmp'
-  path="$(mktemp -d "${temp_base}/xray-chain.XXXXXXXX")"
+  path="$(mktemp -d "${temp_base}/xray-chain.XXXXXXXX")" || return 1
   TEMP_DIRS+=("$path")
   LAST_TEMP_DIR="$path"
 }
@@ -2687,6 +2687,81 @@ script_version_from_file() {
   awk -F'"' '/^SCRIPT_VERSION="[^"]+"$/ {print $2; exit}' "$file"
 }
 
+download_latest_manager() {
+  local output="$1" response commit size version version_count
+  local -a curl_options=(
+    --fail --silent --show-error --location --retry 0
+    --proto '=https' --proto-redir '=https' --tlsv1.2
+    --connect-timeout 3 --max-time 5 --max-filesize "$MAX_INSTALLER_BYTES"
+  )
+  response="$(curl "${curl_options[@]}" \
+    -H 'Accept: application/vnd.github+json' \
+    -H 'User-Agent: puppyip-xray-chain-installer' \
+    "${INSTALLER_API_URL}/git/ref/heads/${INSTALLER_BRANCH}" 2>/dev/null)" || return 1
+  commit="$(jq -er '.object.sha' <<<"$response" 2>/dev/null)" || return 1
+  [[ "$commit" =~ ^[0-9A-Fa-f]{40}$ ]] || return 1
+  if ! curl "${curl_options[@]}" --output "$output" \
+    "${INSTALLER_RAW_BASE}/${commit,,}/install.sh" 2>/dev/null; then
+    rm -f -- "$output"
+    return 1
+  fi
+  [[ -f "$output" && ! -L "$output" ]] || return 1
+  size="$(wc -c <"$output" | tr -d '[:space:]')" || return 1
+  version="$(script_version_from_file "$output")" || return 1
+  version_count="$(grep -c '^SCRIPT_VERSION=' "$output" || true)"
+  if [[ ! "$size" =~ ^[0-9]+$ ]] || (( size < 1 || size > MAX_INSTALLER_BYTES )) \
+    || [[ "$version_count" != '1' || ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] \
+    || ! grep -q '^# XRAY_CHAIN_SCRIPT$' "$output" \
+    || ! bash -n "$output" 2>/dev/null; then
+    rm -f -- "$output"
+    return 1
+  fi
+  chmod 0600 "$output"
+}
+
+maybe_update_manager() {
+  local work_dir candidate version upgrade_status=0 menu_status=0
+  [[ "${XRAY_CHAIN_AUTO_UPDATE:-1}" != '0' ]] || return 0
+  info "正在检查 PuppyIP 管理脚本更新..."
+  if ! new_temp_dir; then
+    warn "无法创建更新临时目录，继续打开本地管理菜单。"
+    return 0
+  fi
+  work_dir="$LAST_TEMP_DIR"
+  candidate="${work_dir}/latest-manager.sh"
+  if ! download_latest_manager "$candidate"; then
+    warn "更新检查或脚本下载校验失败，继续打开本地管理菜单。"
+    return 0
+  fi
+  version="$(script_version_from_file "$candidate")"
+  if ! semantic_version_is_newer "$version" "$SCRIPT_VERSION"; then
+    info "当前管理脚本为 ${SCRIPT_VERSION}，无需更新。"
+    return 0
+  fi
+  info "发现 PuppyIP ${version}，正在自动更新；现有节点和链接会保留。"
+  warn "更新会重启 PuppyIP 服务；若 SSH 经过本机代理，连接可能中断。"
+  # A separate shell keeps errexit and rollback active inside the updater.
+  bash "$candidate" upgrade || upgrade_status=$?
+  if [[ "$(installed_state_version)" != "$version" \
+    || "$(installed_manager_version "$MANAGER_BIN")" != "$version" \
+    || "$(installed_manager_version "$LEGACY_MANAGER_BIN")" != "$version" ]]; then
+    if (( upgrade_status != 0 )); then
+      warn "自动更新未成功，继续打开本地管理菜单。"
+    else
+      warn "自动更新结果未通过版本核对，继续打开本地管理菜单。"
+    fi
+    return 0
+  fi
+  if (( upgrade_status != 0 )); then
+    warn "新版脚本已安装，但更新收尾未完成；请查看上方错误提示。"
+  fi
+  info "正在进入 PuppyIP ${version} 管理菜单。"
+  # The parent still has the old functions loaded. Run the installed copy once,
+  # then exit so returning from its menu cannot reopen the old menu.
+  XRAY_CHAIN_AUTO_UPDATE=0 bash "$MANAGER_BIN" || menu_status=$?
+  exit "$menu_status"
+}
+
 semantic_version_is_newer() {
   local left="${1#v}" right="${2#v}" index
   local -a left_parts right_parts
@@ -3526,7 +3601,7 @@ usage() {
   cat <<EOF
 用法：
   sudo bash install.sh install
-  sudo puppyip                         打开管理菜单
+  sudo puppyip                         自动检查脚本更新并打开管理菜单
   sudo puppyip add                     新增一个或批量新增 SOCKS5 出口
   sudo puppyip list                    查看节点摘要
   sudo puppyip show [all|节点编号]     显示链接和二维码
@@ -3550,6 +3625,7 @@ usage() {
   XRAY_CHAIN_PORT=62001              指定首次安装的首节点端口；其余节点自动选择高位端口
   XRAY_CHAIN_UDP_MODE=block|proxy     新节点 UDP 策略；默认 proxy
   XRAY_CHAIN_ENABLE_BBR=1|0           自动启用 BBR；默认 1，设为 0 时不修改 TCP 参数
+  XRAY_CHAIN_AUTO_UPDATE=1|0          打开管理菜单时自动更新脚本；默认 1，设为 0 跳过
   XRAY_CHAIN_ALLOW_UNVERIFIED=1      非交互模式允许跳过失败的联网验证
 EOF
 }
@@ -3593,6 +3669,8 @@ main() {
         return
       fi
       show_brand_banner
+      require_root
+      maybe_update_manager
       while true; do
         show_menu
         if ! read -r -p '请选择要做的操作 [0-11]: ' command; then

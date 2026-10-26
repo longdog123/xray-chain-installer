@@ -10,6 +10,7 @@ run_worker() {
   local scenario="$1" case_dir="$2"
   # shellcheck source=../install.sh
   source "${ROOT_DIR}/install.sh"
+  export XRAY_CHAIN_AUTO_UPDATE=0
   # Keep observable service boundaries even when production redirects systemctl.
   exec 3>&1
   export PREVIEW_SCENARIO="$scenario"

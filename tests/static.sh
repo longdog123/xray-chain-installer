@@ -8,6 +8,7 @@ bash -n "$SCRIPT"
 bash -n "${ROOT_DIR}/tests/integration.sh"
 bash -n "${ROOT_DIR}/tests/add-preview.sh"
 bash -n "${ROOT_DIR}/tests/port-change.sh"
+bash -n "${ROOT_DIR}/tests/auto-update.sh"
 [[ ! -f "${ROOT_DIR}/tests/preflight.sh" ]] || bash -n "${ROOT_DIR}/tests/preflight.sh"
 
 bash -c '
@@ -966,7 +967,7 @@ if command -v shellcheck >/dev/null 2>&1; then
   shellcheck "$SCRIPT" "${ROOT_DIR}/tests/static.sh" \
     "${ROOT_DIR}/tests/integration.sh" "${ROOT_DIR}/tests/preflight.sh" \
     "${ROOT_DIR}/tests/rollback.sh" "${ROOT_DIR}/tests/add-preview.sh" \
-    "${ROOT_DIR}/tests/port-change.sh"
+    "${ROOT_DIR}/tests/port-change.sh" "${ROOT_DIR}/tests/auto-update.sh"
 fi
 
 printf '静态检查通过。\n'
