@@ -1,0 +1,194 @@
+{
+  "schema": 1,
+  "kind": "isolated_regression_tests",
+  "installer_version": "0.2.23",
+  "started_at_utc": "2026-11-04T10:38:25.617099+00:00",
+  "source_base_commit": "7767e5fd60dccc0963f3587219dcf0f99b6931a2",
+  "source_snapshot_has_uncommitted_changes": true,
+  "source_sha256": "e7e178c471a3e885e51506752a2de9b6bddc67310d3d2137020674ecde9f63a9",
+  "runtime_version": "Xray 26.3.27 (Xray, Penetrates Everything.) d2758a0 (go1.26.1 linux/amd64)",
+  "runtime_files_sha256": {
+    "xray": "8255dd939c34cf966cc91517b6324dd3c8d0bcf49ffac8beca049a38c46845ed",
+    "geoip.dat": "744c97b74c52bae2ac8664fef6ac481d7765cb8432a0df54f0368a88b9b4a354",
+    "geosite.dat": "adf92de0cfc70e458b399f04c5f912bf42d115ed7e37281b30e2f1c68605e4e9"
+  },
+  "runtime_reused_from": "2026-11-04-address-refresh-regressions.json",
+  "reason": "0.2.23 changes error diagnostics, rollback reporting and invalid-input rejection; existing behavior is rechecked for this changed implementation.",
+  "previous_behavior_evidence": "2026-11-04-machine-address-regressions.json",
+  "red_baseline_evidence": "2026-11-04-system-errors-red.json",
+  "environment": {
+    "os": "Ubuntu 24.04 LTS on isolated WSL",
+    "architecture": "x86_64",
+    "network": "Every suite runs under unshare --net; no external network access",
+    "shellcheck_available": false
+  },
+  "results": [
+    {
+      "suite": "tests/integration.sh",
+      "started_at_utc": "2026-11-04T10:38:25.621987+00:00",
+      "completed_at_utc": "2026-11-04T10:38:29.028803+00:00",
+      "elapsed_seconds": 3.407,
+      "exit_code": 0,
+      "status": "passed",
+      "timed_out": false,
+      "test_sha256": "8ab89bc9778efa9402bdf43fa956b7e70b3c4a377fd433b6d4ade25f2beab697",
+      "source_sha256_unchanged": true
+    },
+    {
+      "suite": "tests/add-preview.sh",
+      "started_at_utc": "2026-11-04T10:38:29.029415+00:00",
+      "completed_at_utc": "2026-11-04T10:38:38.503407+00:00",
+      "elapsed_seconds": 11.084,
+      "exit_code": 0,
+      "status": "passed",
+      "timed_out": false,
+      "test_sha256": "cb11fa9c8c812c1602a4254ab2efdd005d9639cb458bf9c0e488f417d17ba34a",
+      "source_sha256_unchanged": true
+    },
+    {
+      "suite": "tests/port-change.sh",
+      "started_at_utc": "2026-11-04T10:38:38.503931+00:00",
+      "completed_at_utc": "2026-11-04T10:38:38.565570+00:00",
+      "elapsed_seconds": 0.062,
+      "exit_code": 0,
+      "status": "passed",
+      "timed_out": false,
+      "test_sha256": "3aabe799e1d7c8239aaac4be1a3d05027a80d87036a41adafb2f026ba4fa0ca9",
+      "source_sha256_unchanged": true
+    },
+    {
+      "suite": "tests/rollback.sh",
+      "started_at_utc": "2026-11-04T10:38:38.565901+00:00",
+      "completed_at_utc": "2026-11-04T10:38:39.100572+00:00",
+      "elapsed_seconds": 0.535,
+      "exit_code": 0,
+      "status": "passed",
+      "timed_out": false,
+      "test_sha256": "a76d3dd8508f2b97ea4b22994e88de758de80c7a07a1a03351a2b5f4fde6c5e0",
+      "source_sha256_unchanged": true
+    },
+    {
+      "suite": "tests/auto-update.sh",
+      "started_at_utc": "2026-11-04T10:38:39.100946+00:00",
+      "completed_at_utc": "2026-11-04T10:38:42.212590+00:00",
+      "elapsed_seconds": 3.112,
+      "exit_code": 0,
+      "status": "passed",
+      "timed_out": false,
+      "test_sha256": "23cdbaf20a4ad10761c03dc1a7a02aeb6efe49b49e7669c95bb3420fa679d6d2",
+      "source_sha256_unchanged": true
+    },
+    {
+      "suite": "tests/static.sh",
+      "started_at_utc": "2026-11-04T10:38:42.213046+00:00",
+      "completed_at_utc": "2026-11-04T10:38:44.793084+00:00",
+      "elapsed_seconds": 2.58,
+      "exit_code": 0,
+      "status": "passed",
+      "timed_out": false,
+      "test_sha256": "12f00263ddc4a2323d1307bfa990d377f600a5bcdd065b61af0abcff9faf2543",
+      "source_sha256_unchanged": true
+    },
+    {
+      "suite": "tests/socks-verification.sh",
+      "started_at_utc": "2026-11-04T10:38:44.793405+00:00",
+      "completed_at_utc": "2026-11-04T10:38:47.331152+00:00",
+      "elapsed_seconds": 2.538,
+      "exit_code": 0,
+      "status": "passed",
+      "timed_out": false,
+      "test_sha256": "817b27d979b71717c3347a6cdc20fae7cde337e4ab5eaffb32bec8cfc327800d",
+      "source_sha256_unchanged": true
+    },
+    {
+      "suite": "tests/address-refresh.sh",
+      "started_at_utc": "2026-11-04T10:38:47.331435+00:00",
+      "completed_at_utc": "2026-11-04T10:39:11.543421+00:00",
+      "elapsed_seconds": 25.837,
+      "exit_code": 0,
+      "status": "passed",
+      "timed_out": false,
+      "test_sha256": "420e2ca0368d457b8fed12a14d57eda90751e40cede90bf8b877f1692b0d78e4",
+      "source_sha256_unchanged": true
+    },
+    {
+      "suite": "tests/system-errors.sh",
+      "started_at_utc": "2026-11-04T10:39:11.543832+00:00",
+      "completed_at_utc": "2026-11-04T10:39:11.688292+00:00",
+      "elapsed_seconds": 0.144,
+      "exit_code": 0,
+      "status": "passed",
+      "timed_out": false,
+      "test_sha256": "311241709c7bc0cf260ddb98e6776ddcbac27630c9d70526d69ce2fa4fd972ad",
+      "source_sha256_unchanged": true
+    },
+    {
+      "suite": "tests/status-errors.sh",
+      "started_at_utc": "2026-11-04T10:39:11.688584+00:00",
+      "completed_at_utc": "2026-11-04T10:39:13.568043+00:00",
+      "elapsed_seconds": 1.879,
+      "exit_code": 0,
+      "status": "passed",
+      "timed_out": false,
+      "test_sha256": "b172d3dfeb0db4c5557dfd321cee8120e12707b376dcff53eb3477cac813a542",
+      "source_sha256_unchanged": true
+    },
+    {
+      "suite": "tests/error-context.sh",
+      "started_at_utc": "2026-11-04T10:39:13.568323+00:00",
+      "completed_at_utc": "2026-11-04T10:39:14.186924+00:00",
+      "elapsed_seconds": 0.619,
+      "exit_code": 0,
+      "status": "passed",
+      "timed_out": false,
+      "test_sha256": "b81201322f6b104e17ad7468e0ba590a29efb208c5268296869fe2c923143093",
+      "source_sha256_unchanged": true
+    }
+  ],
+  "completed_at_utc": "2026-11-04T10:39:14.189081+00:00",
+  "passed": true,
+  "cleanup": {
+    "new_fixture_directory_count": 17,
+    "checked_fixture_name_patterns": [
+      "xray-chain-test.*",
+      "xray-chain-rollback-test.*",
+      "xray-chain-port-test.*",
+      "xray-chain.autoupdate-test.*",
+      "xray-chain-add-preview.*",
+      "xray-chain-auto-update.*",
+      "puppyip-socks-verification.*",
+      "xray-chain.*"
+    ],
+    "snapshot_and_verified_runtime_retained": true,
+    "raw_test_logs_excluded_from_public_report": true,
+    "remaining_owned_fixture_directory_count": 17,
+    "cleanup_status": "Test-managed fixtures cleaned by each suite except 17 newly observed synthetic status-probe directories; these remain and were not deleted by this run",
+    "inspected_residual_contents": "All 17 directories contain only status-validation.log and optional status-node-N.result files, with no subdirectories",
+    "previous_run_directories": "Pre-existing temporary directories were excluded by a before/after set and were not modified"
+  },
+  "exclusions": [
+    "No production deployment, credentials, configuration or customer data",
+    "No real provider IP replacement",
+    "No external client reachability, DNS, cloud firewall or NAT test",
+    "Real Xray validates generated configurations; no external end-to-end protocol session is established",
+    "No commit, publication or deployment performed by this runner"
+  ],
+  "source_snapshot_hashes": {
+    "install.sh": "e7e178c471a3e885e51506752a2de9b6bddc67310d3d2137020674ecde9f63a9",
+    "tests/add-preview.sh": "cb11fa9c8c812c1602a4254ab2efdd005d9639cb458bf9c0e488f417d17ba34a",
+    "tests/address-refresh.sh": "420e2ca0368d457b8fed12a14d57eda90751e40cede90bf8b877f1692b0d78e4",
+    "tests/auto-update.sh": "23cdbaf20a4ad10761c03dc1a7a02aeb6efe49b49e7669c95bb3420fa679d6d2",
+    "tests/error-context.sh": "b81201322f6b104e17ad7468e0ba590a29efb208c5268296869fe2c923143093",
+    "tests/integration.sh": "8ab89bc9778efa9402bdf43fa956b7e70b3c4a377fd433b6d4ade25f2beab697",
+    "tests/port-change.sh": "3aabe799e1d7c8239aaac4be1a3d05027a80d87036a41adafb2f026ba4fa0ca9",
+    "tests/preflight.sh": "6e07f3ca04956161c90c83243f8bba5d2f98cd6a13d45c9a99301af7245e46e4",
+    "tests/rollback.sh": "a76d3dd8508f2b97ea4b22994e88de758de80c7a07a1a03351a2b5f4fde6c5e0",
+    "tests/socks-verification.sh": "817b27d979b71717c3347a6cdc20fae7cde337e4ab5eaffb32bec8cfc327800d",
+    "tests/static.sh": "12f00263ddc4a2323d1307bfa990d377f600a5bcdd065b61af0abcff9faf2543",
+    "tests/status-errors.sh": "b172d3dfeb0db4c5557dfd321cee8120e12707b376dcff53eb3477cac813a542",
+    "tests/system-errors.sh": "311241709c7bc0cf260ddb98e6776ddcbac27630c9d70526d69ce2fa4fd972ad"
+  },
+  "tested_files_match_worktree_at_completion": true,
+  "timing_method": "elapsed_seconds uses time.monotonic around each test subprocess including process launch and output capture; UTC timestamps use the system wall clock",
+  "snapshot_hash_scope": "Every suite listed in results was executed. tests/preflight.sh was copied for syntax checking by static; publication preflight is performed separately by the parent task."
+}

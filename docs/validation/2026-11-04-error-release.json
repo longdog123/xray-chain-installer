@@ -1,0 +1,19 @@
+{
+  "version": "0.2.23",
+  "source_sha256": "f777a50d9d5b59614e1fb07bf0ea31e62b4e4e5546532277ebd423492a65ed0b",
+  "preflight": {
+    "started_at_utc": "2026-11-04T10:45:24.332962+00:00",
+    "completed_at_utc": "2026-11-04T10:45:27.324880+00:00",
+    "elapsed_seconds": 3.0,
+    "exit_code": 0,
+    "test_sha256": "6e07f3ca04956161c90c83243f8bba5d2f98cd6a13d45c9a99301af7245e46e4"
+  },
+  "full_regression_evidence": "2026-11-04-error-diagnostics-regressions.json",
+  "final_targeted_regression_evidence": "2026-11-04-rollback-metadata-regressions.json",
+  "review": "Final source differs from the full-suite snapshot only in preservation of rollback metadata after incomplete recovery; affected suites rerun.",
+  "exclusions": [
+    "No real customer SOCKS or server access",
+    "Publication and customer installation are separate actions",
+    "Residual test directories are recorded in the full regression evidence"
+  ]
+}

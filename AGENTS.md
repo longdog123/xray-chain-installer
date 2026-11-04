@@ -16,11 +16,13 @@
 
 ## 修改与发布前验证
 
+- 用户于 2026-11-04 要求：成功提示保持简短；错误提示必须让客户定位失败对象和步骤，并给出下一步。批量 SOCKS5 失败应显示本批序号与网关地址/端口；隐藏账号、密码、完整输入和连接凭据。不能把超时直接断言为被墙或密码错误，不能在恢复失败时声称已回滚。
+
 - 先识别本次允许变化的字段，再对比修改前后的全部节点状态、有效端口、分享链接、实际 Xray 入站/出站及凭据。不能只检查配置文件能被解析或服务能够启动。
 - 升级必须保留并使用 `assert_upgrade_invariants` 等兼容性检查。新状态字段影响连接或路由时，要同步纳入状态归一化、配置渲染、链接生成、旧格式加载和升级不变量检查。
 - 涉及节点、端口或配置迁移的修改，应覆盖旧版共用端口、多条线路、共用与独立端口混用、暂停线路，以及全部线路移离默认端口的情况。重点验证修改一条后，未选中的线路仍保留原连接和出口配置。
 - 涉及升级流程时，应覆盖同版跳过、旧版迁移、失败回滚及自动更新后的菜单交接。保留部署前校验、备份、原子替换与失败回滚，避免失败后混用新旧文件或新旧进程代码。
-- 按修改范围运行现有测试：`tests/integration.sh`、`tests/add-preview.sh`、`tests/port-change.sh`、`tests/auto-update.sh`、`tests/address-refresh.sh`、`tests/socks-verification.sh`、`tests/rollback.sh`、`tests/static.sh`；发布前运行 `tests/preflight.sh`。兼容性检查失败时先修复，不得通过删除或放宽保护性断言来发布。
+- 按修改范围运行现有测试：`tests/integration.sh`、`tests/add-preview.sh`、`tests/port-change.sh`、`tests/auto-update.sh`、`tests/address-refresh.sh`、`tests/socks-verification.sh`、`tests/error-context.sh`、`tests/status-errors.sh`、`tests/system-errors.sh`、`tests/rollback.sh`、`tests/static.sh`；发布前运行 `tests/preflight.sh`。兼容性检查失败时先修复，不得通过删除或放宽保护性断言来发布。
 - 对外说明应区分本地实现、已验证结果、GitHub 发布及服务器实际安装状态，不把代码检查结果说成已验证所有客户网络可达。
 
 ## GitHub 账号与仓库

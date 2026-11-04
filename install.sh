@@ -5,7 +5,7 @@
 set -Eeuo pipefail
 umask 077
 
-SCRIPT_VERSION="0.2.22"
+SCRIPT_VERSION="0.2.23"
 CURRENT_STATE_SCHEMA=2
 SERVICE_NAME="xray-chain.service"
 RUNTIME_USER="xray-chain"
@@ -319,10 +319,35 @@ refresh_brand_banner() {
 }
 
 show_error_log() {
-  local log_file="$1"
+  local log_file="$1" matched='no' pattern message
   [[ -s "$log_file" ]] || return 0
-  printf '%s---- 最近的错误输出 ----%s\n' "$C_RED" "$C_RESET" >&2
-  tail -n 30 -- "$log_file" >&2
+  printf '%s---- 错误原因摘要 ----%s\n' "$C_RED" "$C_RESET" >&2
+  # Never echo arbitrary subprocess text: Xray errors may contain credentials.
+  while IFS='|' read -r pattern message; do
+    pattern="${pattern//;/|}"
+    if grep -Eiq -- "$pattern" "$log_file"; then
+      printf '  %s\n' "$message" >&2
+      matched='yes'
+    fi
+  done <<'CAUSES'
+permission denied;operation not permitted;read-only file system|文件权限不足或文件系统只读；请检查目标目录权限和挂载状态。
+no space left;disk quota exceeded|磁盘空间或配额不足；请用 df -h 和 df -i 检查空间及 inode。
+could not get lock;unable to acquire.*lock;dpkg.*locked|系统软件包锁被占用；请等待其他 apt/dpkg 操作结束后重试。
+could not resolve;temporary failure in name resolution;name or service not known|DNS 解析失败；请检查 VPS 的 DNS 和到目标域名的网络。
+timed out;timeout was reached;connection timeout|网络请求超时；请检查 VPS 到提示目标的网络可达性。
+connection refused;failed to connect;network is unreachable;no route to host|连接被拒绝或网络/路由不可达；请检查目标端口和 VPS 网络。
+certificate verify;ssl certificate;tls handshake;ssl connect error|TLS 握手或证书校验失败；请检查系统时间、CA 证书和目标站点。
+address already in use;failed to listen|监听端口冲突或无法绑定；请用 ss -lntup 检查入口端口，不要直接停止其他面板。
+invalid.*key;failed to parse.*key;empty.*key|密钥字段校验失败；请检查 REALITY 密钥与核心版本，勿重新生成已有线路凭据。
+invalid.*uuid;failed.*uuid|节点 UUID 格式校验失败；请检查该节点的保存状态和配置。
+invalid.*json;invalid character;unexpected.*token;unexpected.*end;failed to.*config|配置语法或结构校验失败；请检查配置格式、字段及核心版本是否匹配。
+geoip.*not found;geosite.*not found;failed to load.*dat|Geo 数据读取失败；请检查 geoip.dat、geosite.dat 是否完整且可读。
+unable to locate package;no installation candidate;unmet dependencies;dpkg was interrupted|软件源或软件包状态异常；请修复 apt 软件源或未完成的 dpkg 操作后重试。
+requested URL returned error|下载服务返回 HTTP 错误；请检查目标发布文件是否存在及网络访问限制。
+CAUSES
+  if [[ "$matched" == 'no' ]]; then
+    printf '  底层错误未能自动分类；请按本次失败步骤检查对应文件或服务。原始输出可能含连接凭据，未直接显示。\n' >&2
+  fi
 }
 
 show_socks_promo() {
@@ -354,7 +379,10 @@ trap cleanup EXIT
 new_temp_dir() {
   local path temp_base='/var/tmp'
   [[ -d "$temp_base" ]] || temp_base='/tmp'
-  path="$(mktemp -d "${temp_base}/xray-chain.XXXXXXXX")" || return 1
+  if ! path="$(mktemp -d "${temp_base}/xray-chain.XXXXXXXX")"; then
+    warn "创建 PuppyIP 临时目录失败：${temp_base}；请检查目录权限、磁盘空间及 inode。"
+    return 1
+  fi
   TEMP_DIRS+=("$path")
   LAST_TEMP_DIR="$path"
 }
@@ -372,9 +400,9 @@ require_systemd() {
 
 acquire_lock() {
   command -v flock >/dev/null 2>&1 || die "缺少 flock（util-linux），无法安全执行并发保护。"
-  mkdir -p "$(dirname "$LOCK_FILE")"
-  exec 9>"$LOCK_FILE"
-  flock -n 9 || die "另一个 xray-chain 操作正在运行。"
+  mkdir -p "$(dirname "$LOCK_FILE")" || die "创建操作锁目录失败：$(dirname "$LOCK_FILE")；请检查权限和磁盘空间。"
+  exec 9>"$LOCK_FILE" || die "打开操作锁失败：${LOCK_FILE}；请检查目录权限和文件属性。"
+  flock -n 9 || die "另一个 PuppyIP 安装或管理操作正在运行（锁：${LOCK_FILE}）；请等待该操作结束后重试。"
 }
 
 installation_complete() {
@@ -465,17 +493,19 @@ install_dependencies() {
 
   export DEBIAN_FRONTEND=noninteractive
   if [[ "$missing" == 'yes' ]]; then
-    if ! run_logged_task "更新软件源" "$log_file" apt-get update \
-      || ! run_logged_task "安装系统依赖" "$log_file" \
-        apt-get install -y "${required_packages[@]}"; then
+    if ! run_logged_task "更新软件源" "$log_file" apt-get update; then
       show_error_log "$log_file"
-      die "系统依赖安装失败。"
+      die "apt 软件源索引更新失败，未进入节点部署；请按上方原因修复后执行 apt-get update。"
+    fi
+    if ! run_logged_task "安装系统依赖" "$log_file" apt-get install -y "${required_packages[@]}"; then
+      show_error_log "$log_file"
+      die "apt 安装系统依赖失败，未进入节点部署；请按上方原因检查软件包状态、磁盘或 apt 锁后重试。"
     fi
   fi
 
   if ! command -v qrencode >/dev/null 2>&1; then
     if ! run_logged_task "安装二维码组件" "$log_file" apt-get install -y qrencode; then
-      warn "二维码组件安装失败，将只显示链接。"
+      warn "二维码组件 qrencode 安装失败，将只显示链接；可在修复 apt 后执行 apt-get install -y qrencode。"
     fi
   fi
 }
@@ -528,7 +558,7 @@ restore_bbr_settings() {
   fi
 
   if [[ "$restore_failed" == 'yes' ]]; then
-    warn "BBR 恢复失败，请重启服务器。"
+    warn "BBR 恢复失败：无法写回原 TCP 拥塞控制或默认 qdisc；请检查 sysctl 权限和内核支持，恢复记录保留在 ${BBR_STATE_FILE}。"
     return 0
   fi
   rm -f -- "$BBR_STATE_FILE"
@@ -547,20 +577,20 @@ configure_bbr() {
       return 0
       ;;
     *)
-      warn "BBR 设置无效，已跳过。"
+      warn "XRAY_CHAIN_ENABLE_BBR 设置无效，已跳过 BBR；请使用 1（启用）或 0（跳过）。"
       return 0
       ;;
   esac
 
   if ! command -v sysctl >/dev/null 2>&1; then
-    warn "无法启用 BBR，已跳过。"
+    warn "无法启用 BBR：未找到 sysctl，已跳过；请检查 procps 是否安装。"
     return 0
   fi
   current_cc="$(read_sysctl_value net.ipv4.tcp_congestion_control)"
   current_qdisc="$(read_sysctl_value net.core.default_qdisc)"
   if ! valid_kernel_setting_token "$current_cc" \
     || ! valid_kernel_setting_token "$current_qdisc"; then
-    warn "无法启用 BBR，已跳过。"
+    warn "无法启用 BBR：读取 net.ipv4.tcp_congestion_control 或 net.core.default_qdisc 失败，已跳过；请检查内核和 sysctl 权限。"
     return 0
   fi
   if [[ "$current_cc" == 'bbr' ]]; then
@@ -569,16 +599,16 @@ configure_bbr() {
   fi
 
   if [[ -e "$BBR_SYSCTL_FILE" ]] && ! managed_bbr_file "$BBR_SYSCTL_FILE"; then
-    warn "检测到现有网络设置，未修改 BBR。"
+    warn "BBR 已跳过：${BBR_SYSCTL_FILE} 不属于 PuppyIP，未覆盖；请先检查该文件的来源。"
     return 0
   fi
   if [[ -e "$BBR_MODULES_FILE" ]] && ! managed_bbr_file "$BBR_MODULES_FILE"; then
-    warn "检测到现有网络设置，未修改 BBR。"
+    warn "BBR 已跳过：${BBR_MODULES_FILE} 不属于 PuppyIP，未覆盖；请先检查该文件的来源。"
     return 0
   fi
   if [[ -e "$BBR_STATE_FILE" ]]; then
     if ! bbr_state_is_valid; then
-      warn "BBR 状态异常，已跳过。"
+      warn "BBR 恢复记录格式异常：${BBR_STATE_FILE}，已跳过；请保留该文件并检查内容，勿直接覆盖。"
       return 0
     fi
     previous_cc="$(jq -er '.previousCongestionControl' "$BBR_STATE_FILE")"
@@ -594,7 +624,7 @@ configure_bbr() {
   fi
   available="$(read_sysctl_value net.ipv4.tcp_available_congestion_control)"
   if [[ " ${available} " != *' bbr '* ]]; then
-    warn "当前系统不支持 BBR，已跳过。"
+    warn "内核可用拥塞控制中没有 bbr，已跳过；可用 sysctl net.ipv4.tcp_available_congestion_control 检查内核支持。"
     return 0
   fi
 
@@ -613,7 +643,7 @@ configure_bbr() {
         previousDefaultQdisc: $previous_qdisc
       }
     ' >"$state_candidate"; then
-    warn "BBR 配置失败，已跳过。"
+    warn "生成 BBR 恢复记录失败，已跳过；请检查 jq、临时目录权限和磁盘空间。"
     return 0
   fi
   printf '%s\nnet.core.default_qdisc = fq\nnet.ipv4.tcp_congestion_control = bbr\n' \
@@ -621,13 +651,13 @@ configure_bbr() {
   printf '%s\ntcp_bbr\nsch_fq\n' "$BBR_MANAGED_HEADER" >"$modules_candidate"
   if ! install -d -o root -g root -m 0755 "$(dirname "$BBR_SYSCTL_FILE")" \
     "$(dirname "$BBR_MODULES_FILE")"; then
-    warn "BBR 配置失败，已跳过。"
+    warn "创建 BBR 配置目录失败，已跳过；请检查 /etc/sysctl.d 和 /etc/modules-load.d 的权限及磁盘空间。"
     return 0
   fi
 
   if [[ ! -e "$BBR_STATE_FILE" ]] \
     && ! atomic_install "$state_candidate" "$BBR_STATE_FILE" 0600 root root; then
-    warn "BBR 配置失败，已跳过。"
+    warn "保存 BBR 恢复记录失败：${BBR_STATE_FILE}，已跳过；请检查上方文件写入错误。"
     return 0
   fi
   if ! atomic_install "$sysctl_candidate" "$BBR_SYSCTL_FILE" 0644 root root \
@@ -636,7 +666,7 @@ configure_bbr() {
     || ! sysctl -q -w net.ipv4.tcp_congestion_control=bbr >/dev/null 2>&1 \
     || [[ "$(read_sysctl_value net.core.default_qdisc)" != 'fq' ]] \
     || [[ "$(read_sysctl_value net.ipv4.tcp_congestion_control)" != 'bbr' ]]; then
-    warn "BBR 启用失败，正在恢复。"
+    warn "BBR 配置写入、sysctl 应用或生效检查失败，正在恢复原 TCP 设置；请检查文件权限及内核支持。"
     restore_bbr_settings
     return 0
   fi
@@ -649,7 +679,7 @@ configure_bbr() {
       && systemctl is-active --quiet "$SERVICE_NAME"; then
       :
     else
-      warn "请执行：systemctl restart ${SERVICE_NAME}"
+      warn "应用 BBR 后 ${SERVICE_NAME} 未保持运行；请执行 puppyip status 检查服务，修复原因后执行 systemctl restart ${SERVICE_NAME}。"
       systemctl start "$SERVICE_NAME" >/dev/null 2>&1 || true
     fi
   fi
@@ -694,14 +724,20 @@ download_file() {
 }
 
 resolve_xray_version() {
-  local tag="${XRAY_VERSION:-$DEFAULT_XRAY_VERSION}"
+  local tag="${XRAY_VERSION:-$DEFAULT_XRAY_VERSION}" response status
   if [[ "$tag" == 'latest' ]]; then
-    tag="$(curl --fail --silent --show-error --location --retry 3 \
+    if response="$(curl --fail --silent --show-error --location --retry 3 \
       --connect-timeout 10 --max-time 30 \
       -H 'Accept: application/vnd.github+json' \
       -H 'User-Agent: xray-chain-installer' \
-      'https://api.github.com/repos/XTLS/Xray-core/releases/latest' \
-      | jq -er '.tag_name')"
+      'https://api.github.com/repos/XTLS/Xray-core/releases/latest' 2>/dev/null)"; then
+      :
+    else
+      status=$?
+      die "获取 Xray 最新版本失败（api.github.com，curl 代码 ${status}）；请检查 VPS 到 GitHub API 的网络后重试。"
+    fi
+    tag="$(jq -er '.tag_name' <<<"$response" 2>/dev/null)" \
+      || die "Xray 最新版本响应缺少有效版本信息；请检查 GitHub API 是否可达，未下载核心。"
   fi
   [[ "$tag" =~ ^v[0-9][0-9A-Za-z.-]*$ ]] || die "Xray 版本号不合法：$tag"
   printf '%s' "$tag"
@@ -719,16 +755,16 @@ download_xray() {
   digest_file="${zip_file}.dgst"
 
   if ! download_file "$zip_file" "${base_url}/${asset}" 300 yes "下载 Xray-core ${tag}"; then
-    die "无法从 XTLS 官方仓库下载 Xray-core ${tag}。"
+    die "下载 Xray-core ${tag}（${asset}）失败，来源 github.com/XTLS/Xray-core；请检查 VPS 到 GitHub 的网络和磁盘空间后重试。"
   fi
   if ! download_file "$digest_file" "${base_url}/${asset}.dgst" 30; then
-    die "无法下载 Xray-core ${tag} 的官方摘要文件。"
+    die "下载 Xray-core ${tag} 的 ${asset}.dgst 摘要文件失败；请检查 VPS 到 GitHub 的网络后重试，未使用未经校验的压缩包。"
   fi
 
   expected="$(awk -F'= *' '/^SHA2-256=/{print $2; exit}' "$digest_file" | tr -d '[:space:]')"
-  [[ "$expected" =~ ^[0-9A-Fa-f]{64}$ ]] || die "官方摘要文件中没有有效的 SHA2-256。"
+  [[ "$expected" =~ ^[0-9A-Fa-f]{64}$ ]] || die "Xray ${tag} 的 ${asset}.dgst 未包含有效 SHA2-256；已停止安装，请检查官方发布文件后重试。"
   actual="$(sha256sum "$zip_file" | awk '{print $1}')"
-  [[ "${actual,,}" == "${expected,,}" ]] || die "Xray 压缩包 SHA-256 校验失败。"
+  [[ "${actual,,}" == "${expected,,}" ]] || die "Xray ${tag} 的 ${asset} SHA-256 校验失败，与官方摘要不符；已停止安装，请重新下载，勿跳过校验。"
 
   while IFS= read -r member; do
     case "$member" in
@@ -743,7 +779,8 @@ download_xray() {
     || die "Xray 压缩包缺少必要文件。"
 
   mkdir -p "${destination}/xray"
-  unzip -q "$zip_file" -d "${destination}/xray"
+  unzip -q "$zip_file" -d "${destination}/xray" \
+    || die "解压 Xray ${tag} 的 ${asset} 失败；请检查压缩包、临时目录权限及磁盘空间，未部署本次核心。"
   [[ -f "${destination}/xray/xray" && ! -L "${destination}/xray/xray" ]] || die "Xray 压缩包缺少安全的 xray 文件。"
   [[ -f "${destination}/xray/geoip.dat" && ! -L "${destination}/xray/geoip.dat" ]] || die "Xray 压缩包缺少安全的 geoip.dat。"
   [[ -f "${destination}/xray/geosite.dat" && ! -L "${destination}/xray/geosite.dat" ]] || die "Xray 压缩包缺少安全的 geosite.dat。"
@@ -824,12 +861,16 @@ confirm_continue() {
 }
 
 valid_port() {
-  [[ "$1" =~ ^[0-9]+$ ]] && (( 10#$1 >= 1 && 10#$1 <= 65535 ))
+  local port="$1"
+  [[ "$port" =~ ^[0-9]+$ ]] || return 1
+  port="${port#"${port%%[!0]*}"}"
+  [[ -n "$port" && ${#port} -le 5 ]] && (( 10#$port >= 1 && 10#$port <= 65535 ))
 }
 
 valid_ipv4() {
   local address="$1" octet
   local -a octets=()
+  [[ "$address" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ ]] || return 1
   IFS='.' read -r -a octets <<<"$address"
   [[ ${#octets[@]} -eq 4 ]] || return 1
   for octet in "${octets[@]}"; do
@@ -1146,7 +1187,7 @@ select_inbound_port() {
   if [[ -n "$requested" ]]; then
     valid_port "$requested" \
       || die "XRAY_CHAIN_PORT 必须是 1-65535 的单个整数端口。"
-    [[ "$excluded_ports" != *" $requested "* ]] || die "指定端口已分配给现有节点。"
+    [[ "$excluded_ports" != *" $requested "* ]] || die "指定入口端口 ${requested}/tcp 已分配给现有节点；请用 puppyip list 查看占用，或取消 XRAY_CHAIN_PORT 设置后使用随机端口。"
     if port_is_listening "$requested"; then
       die "指定端口 ${requested} 已被现有 TCP 或 UDP 服务占用。"
     fi
@@ -1232,8 +1273,38 @@ collect_global_settings() {
   fi
 }
 
+safe_socks_endpoint() {
+  local host="$1" port="$2"
+  if valid_ipv4_or_domain "$host" && [[ "$port" =~ ^[0-9]{1,5}$ ]] && valid_port "$port"; then
+    printf '%s:%s' "$host" "$port"
+  else
+    printf '地址未识别'
+  fi
+}
+
+socks_entry_error_endpoint() {
+  local entry="$1" host remainder
+  host="${entry%%:*}"
+  remainder="${entry#*:}"
+  safe_socks_endpoint "$host" "${remainder%%:*}"
+}
+
+socks_operation_label() {
+  local mode="${1:-add}" identifier="${2:-}" total="${3:-}"
+  if [[ "$mode" == 'batch' && "$identifier" =~ ^[0-9]+$ && "$total" =~ ^[0-9]+$ ]]; then
+    printf '批量新增第 %s/%s 条' "$identifier" "$total"
+  elif [[ "$mode" == 'edit' && "$identifier" =~ ^node-[0-9]+$ ]]; then
+    printf '编辑节点 %s' "$identifier"
+  elif [[ "$mode" == 'edit' ]]; then
+    printf '编辑所选节点'
+  else
+    printf '新增线路'
+  fi
+}
+
 collect_socks_settings() {
-  local mode="$1" node_id="${2:-}" socks_entry direct_ip
+  local mode="$1" node_id="${2:-}" socks_entry direct_ip context
+  context="$(socks_operation_label "$mode" "$node_id")"
   SOCKS_INPUT_CHANGED='no'
   show_socks_promo "$mode"
 
@@ -1247,11 +1318,11 @@ collect_socks_settings() {
       direct_ip="$(detect_display_direct_ip || true)"
       printf '当前出口：VPS 本机直连 · %s\n' "${direct_ip:-未验证}"
       IFS= read -r -s -p "SOCKS5: " socks_entry \
-        || die "未读取到节点出口信息。"
+        || die "${context}：未读取到节点出口信息；本次修改已取消，节点原配置保留。"
     else
-      printf '当前 SOCKS5：%s:%s\n' "$SOCKS_HOST" "$SOCKS_PORT"
+      printf '当前 SOCKS5：%s\n' "$(safe_socks_endpoint "$SOCKS_HOST" "$SOCKS_PORT")"
       IFS= read -r -s -p "SOCKS5: " socks_entry \
-        || die "未读取到节点出口信息。"
+        || die "${context}：未读取到节点出口信息；本次修改已取消，节点原配置保留。"
     fi
   else
     NODE_TYPE='socks'
@@ -1260,7 +1331,7 @@ collect_socks_settings() {
     SOCKS_USER=''
     SOCKS_PASS=''
     IFS= read -r -s -p "SOCKS5: " socks_entry \
-      || die "未读取到 SOCKS5 信息。"
+      || die "${context}：未读取到 SOCKS5 信息；本次新增已取消。"
   fi
   printf '\n'
 
@@ -1272,13 +1343,14 @@ collect_socks_settings() {
     return 0
   fi
   parse_socks5_entry "$socks_entry" \
-    || die "SOCKS5 格式错误，应为 IP:端口:用户名:密码；无认证时可填 IP:端口。"
+    || die "${context} · SOCKS5 $(socks_entry_error_endpoint "$socks_entry")：格式错误；应为 IP:端口:用户名:密码，无认证时可填 IP:端口。请核对后重新操作，本次未写入配置。"
   NODE_TYPE='socks'
   SOCKS_INPUT_CHANGED='yes'
 }
 
 collect_socks_batch_settings() {
-  local parse_status
+  local parse_status normalized entry
+  local -a input_entries=()
   ADD_DIRECT_NODE='no'
   show_socks_promo
   read_hidden_socks_batch_input "SOCKS5: "
@@ -1295,10 +1367,17 @@ collect_socks_batch_settings() {
   else
     parse_status=$?
     case "$parse_status" in
-      1) die "SOCKS5 信息不能为空。" ;;
-      2) die "单次最多添加 ${MAX_BATCH_SIZE} 条 SOCKS5，请分批操作。" ;;
-      3) die "第 ${SOCKS_BATCH_ERROR_INDEX} 条 SOCKS5 格式错误；应为 IP:端口:用户名:密码，无认证时可填 IP:端口。" ;;
-      *) die "无法解析 SOCKS5 批量输入。" ;;
+      1) die "SOCKS5 信息不能为空；本批未写入配置，请重新输入。" ;;
+      2) die "单次最多添加 ${MAX_BATCH_SIZE} 条 SOCKS5；本批未写入配置，请分批操作。" ;;
+      3)
+        normalized="${SOCKS_BATCH_RAW//$'\r'/ }"
+        normalized="${normalized//$'\n'/ }"
+        normalized="${normalized//$'\t'/ }"
+        read -r -a input_entries <<<"$normalized"
+        entry="${input_entries[$((SOCKS_BATCH_ERROR_INDEX - 1))]}"
+        die "批量新增第 ${SOCKS_BATCH_ERROR_INDEX}/${#input_entries[@]} 条 · SOCKS5 $(socks_entry_error_endpoint "$entry")：格式错误；应为 IP:端口:用户名:密码，无认证时可填 IP:端口。本批全部未写入配置，请修正后重新添加。"
+        ;;
+      *) die "无法解析 SOCKS5 批量输入；本批未写入配置，请核对格式后重试。" ;;
     esac
   fi
   SOCKS_BATCH_RAW=''
@@ -1322,6 +1401,7 @@ curl_config_escape() {
 
 verify_socks_proxy() {
   local work_dir="$1" proxy_host proxy_user proxy_pass config_path diagnostic_path exit_ip
+  local mode="${2:-add}" identifier="${3:-}" total="${4:-}" context confirmation
   proxy_host="$SOCKS_HOST"
   [[ "$proxy_host" == *:* ]] && proxy_host="[${proxy_host}]"
   proxy_user="$(curl_config_escape "$SOCKS_USER")"
@@ -1344,17 +1424,32 @@ verify_socks_proxy() {
     SOCKS_EXIT_IP="$exit_ip"
     rm -f -- "$diagnostic_path"
   else
-    warn "SOCKS5 出口验证失败，检测结果如下："
+    context="$(socks_operation_label "$mode" "$identifier" "$total")"
+    warn "${context} · SOCKS5 $(safe_socks_endpoint "$SOCKS_HOST" "$SOCKS_PORT")：出口验证失败。"
     if [[ -s "$diagnostic_path" ]]; then cat -- "$diagnostic_path" >&2; fi
     rm -f -- "$diagnostic_path"
-    confirm_continue "仍要写入配置吗？"
+    case "$mode" in
+      batch)
+        warn "此时本批尚未部署；输入 y 仅允许这条未验证线路加入待部署配置，随后继续处理其余条目。回车或 n 取消本批全部新增，已有线路配置保留。"
+        confirmation="${context}：仍要将这条未验证线路加入本批吗？"
+        ;;
+      edit)
+        warn "输入 y 允许所选节点使用这个未验证出口；回车或 n 取消本次修改，节点原配置保留。"
+        confirmation="${context}：仍要使用这个未验证出口吗？"
+        ;;
+      *)
+        warn "输入 y 允许这条未验证线路加入待部署配置；回车或 n 取消本次新增，已有线路配置保留。"
+        confirmation='仍要添加这条未验证线路吗？'
+        ;;
+    esac
+    confirm_continue "$confirmation"
   fi
 }
 
 verify_reality_target() {
   if ! timeout 15 openssl s_client -connect "$REALITY_TARGET" -servername "$SERVER_NAME" -tls1_3 -brief \
     </dev/null >/dev/null 2>&1; then
-    warn "REALITY 目标无法连接：${REALITY_TARGET}"
+    warn "REALITY 目标检测未通过：${REALITY_TARGET}（SNI：${SERVER_NAME}）；TCP 连接或 TLS 1.3 握手失败/超时，请检查目标 DNS、端口和 TLS 支持后重试或更换目标。"
     confirm_continue "仍要使用这个 REALITY 目标吗？"
   fi
 }
@@ -1700,10 +1795,10 @@ append_batch_nodes_to_model() {
 
   for entry in "${SOCKS_BATCH_ENTRIES[@]}"; do
     ((index += 1))
-    parse_socks5_entry "$entry" || die "第 ${index} 条 SOCKS5 在验证前解析失败。"
+    parse_socks5_entry "$entry" || die "批量新增第 ${index}/${total} 条 · SOCKS5 $(socks_entry_error_endpoint "$entry")：验证前解析失败；本批未写入配置，请核对格式后重新添加。"
     NODE_TYPE='socks'
     show_progress_line "$index" "$total" "正在验证 SOCKS5 · ${index}/${total}"
-    verify_socks_proxy "$(dirname "$MODEL_FILE")"
+    verify_socks_proxy "$(dirname "$MODEL_FILE")" batch "$index" "$total"
     append_current_node_to_model "$candidate_xray"
     NEW_NODE_IDS+=("$SELECTED_NODE_ID")
   done
@@ -1728,7 +1823,7 @@ update_node_socks_in_model() {
     if [[ "$NODE_TYPE" == 'direct' ]]; then
       verify_direct_outbound
     else
-      verify_socks_proxy "$(dirname "$MODEL_FILE")"
+      verify_socks_proxy "$(dirname "$MODEL_FILE")" edit "$node_id"
     fi
   fi
 
@@ -2304,14 +2399,14 @@ validate_config() {
   if ! XRAY_LOCATION_ASSET="$candidate_assets" "$candidate_xray" run -test -c "$candidate_config" \
     >"$log_file" 2>&1; then
     show_error_log "$log_file"
-    die "Xray 配置校验失败。"
+    die "Xray 候选配置校验失败，未部署本次节点修改；请按上方诊断检查端口、连接参数及 Geo 数据后重试。"
   fi
 }
 
 ensure_runtime_layout() {
   local group_created='no' user_created='no'
   if ! getent group "$RUNTIME_GROUP" >/dev/null 2>&1; then
-    groupadd --system "$RUNTIME_GROUP"
+    groupadd --system "$RUNTIME_GROUP" || die "创建 Xray 运行组 ${RUNTIME_GROUP} 失败；请检查系统账户工具和同名组，未开始文件部署。"
     group_created='yes'
     RUNTIME_GROUP_CREATED_THIS_RUN='yes'
   fi
@@ -2321,14 +2416,17 @@ ensure_runtime_layout() {
         groupdel "$RUNTIME_GROUP" >/dev/null 2>&1 || true
         RUNTIME_GROUP_CREATED_THIS_RUN='no'
       fi
-      die "无法创建 Xray 运行用户。"
+      die "创建 Xray 运行用户 ${RUNTIME_USER} 失败；请检查系统账户工具、同名用户与用户组，未开始文件部署。"
     fi
     user_created='yes'
     RUNTIME_USER_CREATED_THIS_RUN='yes'
   fi
-  install -d -o root -g root -m 0755 "$BIN_DIR" "$ASSET_DIR"
-  install -d -o root -g "$RUNTIME_GROUP" -m 0750 "$CONFIG_DIR"
-  install -d -o root -g root -m 0700 "$DATA_DIR" "$BACKUP_DIR"
+  install -d -o root -g root -m 0755 "$BIN_DIR" "$ASSET_DIR" \
+    || die "创建 Xray 程序或 Geo 数据目录失败：${BIN_DIR}、${ASSET_DIR}；请检查权限及磁盘空间。"
+  install -d -o root -g "$RUNTIME_GROUP" -m 0750 "$CONFIG_DIR" \
+    || die "创建节点配置目录失败：${CONFIG_DIR}；请检查运行组、权限及磁盘空间。"
+  install -d -o root -g root -m 0700 "$DATA_DIR" "$BACKUP_DIR" \
+    || die "创建状态或备份目录失败：${DATA_DIR}、${BACKUP_DIR}；请检查权限及磁盘空间。"
   if [[ "$group_created" == 'yes' ]]; then
     : >"$RUNTIME_GROUP_MARKER"
   fi
@@ -2367,10 +2465,12 @@ atomic_install() {
   local source="$1" destination="$2" mode="$3" owner="$4" group="$5" temp_file
   temp_file="${destination}.new.$$"
   if ! install -o "$owner" -g "$group" -m "$mode" "$source" "$temp_file"; then
+    warn "写入文件失败：${destination}（准备临时副本）；请检查源文件、目标目录权限、磁盘空间及 inode。"
     rm -f -- "$temp_file"
     return 1
   fi
   if ! mv -f -- "$temp_file" "$destination"; then
+    warn "替换文件失败：${destination}；请检查目标目录权限、只读挂载或文件属性。"
     rm -f -- "$temp_file"
     return 1
   fi
@@ -2379,7 +2479,10 @@ atomic_install() {
 backup_copy_if_present() {
   local source="$1" destination="$2"
   if [[ -f "$source" ]]; then
-    cp -a -- "$source" "$destination" || return 1
+    if ! cp -a -- "$source" "$destination"; then
+      warn "备份文件失败：${source}；请检查文件可读性以及备份目录权限和磁盘空间。"
+      return 1
+    fi
   fi
 }
 
@@ -2387,7 +2490,7 @@ create_backup() {
   local backup_path timestamp
   timestamp="$(date -u +'%Y%m%dT%H%M%SZ')-$$"
   backup_path="${BACKUP_DIR}/${timestamp}"
-  install -d -o root -g root -m 0700 "$backup_path"
+  install -d -o root -g root -m 0700 "$backup_path" || return 1
 
   if ! backup_copy_if_present "$XRAY_BIN" "${backup_path}/xray" \
     || ! backup_copy_if_present "${ASSET_DIR}/geoip.dat" "${backup_path}/geoip.dat" \
@@ -2419,45 +2522,68 @@ create_backup() {
 restore_one() {
   local backup_file="$1" destination="$2"
   if [[ -f "$backup_file" ]]; then
-    cp -a -- "$backup_file" "$destination"
+    cp -a -- "$backup_file" "$destination" || return 1
   else
-    rm -f -- "$destination"
+    rm -f -- "$destination" || return 1
   fi
 }
 
 rollback_backup() {
-  local backup_path="$1" restore_failed='no'
+  local backup_path="$1" restore_failed='no' service_failed='no' item destination
+  local -a restore_sources=(xray geoip.dat geosite.dat config.json state.json service manager legacy-manager)
+  local -a restore_destinations=("$XRAY_BIN" "${ASSET_DIR}/geoip.dat" "${ASSET_DIR}/geosite.dat"
+    "$CONFIG_FILE" "$STATE_FILE" "$SERVICE_FILE" "$MANAGER_BIN" "$LEGACY_MANAGER_BIN")
   warn "部署失败，正在恢复修改前的文件..."
-  systemctl disable --now "$SERVICE_NAME" >/dev/null 2>&1 || true
-  restore_one "${backup_path}/xray" "$XRAY_BIN" || restore_failed='yes'
-  restore_one "${backup_path}/geoip.dat" "${ASSET_DIR}/geoip.dat" || restore_failed='yes'
-  restore_one "${backup_path}/geosite.dat" "${ASSET_DIR}/geosite.dat" || restore_failed='yes'
-  restore_one "${backup_path}/config.json" "$CONFIG_FILE" || restore_failed='yes'
-  restore_one "${backup_path}/state.json" "$STATE_FILE" || restore_failed='yes'
-  restore_one "${backup_path}/service" "$SERVICE_FILE" || restore_failed='yes'
-  restore_one "${backup_path}/manager" "$MANAGER_BIN" || restore_failed='yes'
-  restore_one "${backup_path}/legacy-manager" "$LEGACY_MANAGER_BIN" || restore_failed='yes'
-  systemctl daemon-reload >/dev/null 2>&1 || true
+  if ! systemctl disable --now "$SERVICE_NAME" >/dev/null 2>&1; then
+    service_failed='yes'
+    warn "回滚时停止服务失败：${SERVICE_NAME}；仍会尝试恢复全部文件。"
+  fi
+  for item in "${!restore_sources[@]}"; do
+    destination="${restore_destinations[$item]}"
+    if ! restore_one "${backup_path}/${restore_sources[$item]}" "$destination"; then
+      restore_failed='yes'
+      warn "回滚文件恢复失败：${destination}；请检查文件权限和磁盘空间，备份位于 ${backup_path}。"
+    fi
+  done
+  if ! systemctl daemon-reload >/dev/null 2>&1; then
+    service_failed='yes'
+    warn "回滚时重新加载 systemd 服务配置失败；请检查 systemctl daemon-reload。"
+  fi
 
   if [[ "$(cat "${backup_path}/was-enabled" 2>/dev/null || true)" == 'yes' ]]; then
-    systemctl enable "$SERVICE_NAME" >/dev/null 2>&1 || true
+    if ! systemctl enable "$SERVICE_NAME" >/dev/null 2>&1; then
+      service_failed='yes'
+      warn "回滚时恢复 ${SERVICE_NAME} 开机启动失败；请检查 systemctl is-enabled ${SERVICE_NAME}。"
+    fi
   else
-    systemctl disable "$SERVICE_NAME" >/dev/null 2>&1 || true
+    if ! systemctl disable "$SERVICE_NAME" >/dev/null 2>&1; then
+      service_failed='yes'
+      warn "回滚时关闭 ${SERVICE_NAME} 开机启动失败；请检查 systemctl is-enabled ${SERVICE_NAME}。"
+    fi
   fi
   if [[ "$(cat "${backup_path}/was-active" 2>/dev/null || true)" == 'yes' ]]; then
-    systemctl restart "$SERVICE_NAME" >/dev/null 2>&1 || true
+    if ! systemctl restart "$SERVICE_NAME" >/dev/null 2>&1 \
+      || ! systemctl is-active --quiet "$SERVICE_NAME"; then
+      service_failed='yes'
+      warn "回滚后服务未恢复运行：${SERVICE_NAME}；请执行 puppyip status 检查配置和监听。"
+    fi
   fi
-  if [[ "$restore_failed" == 'yes' ]]; then
-    warn "部分文件未能自动恢复，请从 ${backup_path} 手动检查。"
+  if [[ "$restore_failed" == 'yes' || "$service_failed" == 'yes' ]]; then
+    warn "自动恢复不完整；请保留备份 ${backup_path}，按上方失败项目检查文件和服务，勿继续覆盖安装。"
+    # Keep even a first-install backup's service-state records for diagnosis.
+    cleanup_runtime_layout_created_this_run
+  else
+    warn "修改前的文件及服务状态已恢复。"
+    cleanup_runtime_layout_created_this_run "$backup_path"
   fi
-  cleanup_runtime_layout_created_this_run "$backup_path"
+  return 0
 }
 
 deploy_full() {
-  local work_dir="$1" backup_path manager_ready="$2"
+  local work_dir="$1" backup_path manager_ready="$2" service_step=''
   if ! backup_path="$(create_backup)"; then
     cleanup_runtime_layout_created_this_run
-    die "无法创建部署前备份，未修改现有服务。"
+    die "无法在 ${BACKUP_DIR} 创建完整部署备份，未修改现有服务；请检查目录权限、源文件可读性及磁盘空间。"
   fi
   if ! atomic_install "${work_dir}/xray/xray" "$XRAY_BIN" 0755 root root \
     || ! atomic_install "${work_dir}/xray/geoip.dat" "${ASSET_DIR}/geoip.dat" 0644 root root \
@@ -2466,32 +2592,39 @@ deploy_full() {
     || ! atomic_install "${work_dir}/candidate-state.json" "$STATE_FILE" 0600 root root \
     || ! atomic_install "${work_dir}/xray-chain.service" "$SERVICE_FILE" 0644 root root; then
     rollback_backup "$backup_path"
-    die "文件部署失败，已回滚。"
+    die "Xray 程序、数据或节点文件部署失败；具体文件及恢复结果见上方提示。"
   fi
 
   if [[ "$manager_ready" == 'yes' ]]; then
     if ! atomic_install "${work_dir}/manager" "$MANAGER_BIN" 0755 root root \
       || ! atomic_install "${work_dir}/manager" "$LEGACY_MANAGER_BIN" 0755 root root; then
       rollback_backup "$backup_path"
-      die "管理命令安装失败，已回滚。"
+      die "安装管理命令 ${MANAGER_BIN} 或 ${LEGACY_MANAGER_BIN} 失败；具体文件及恢复结果见上方提示。"
     fi
   else
     warn "无法保存脚本副本；以后可重新运行远程脚本进行管理。"
   fi
 
-  if ! systemctl daemon-reload >/dev/null 2>&1 \
-    || ! systemctl enable "$SERVICE_NAME" >/dev/null 2>&1 \
-    || ! systemctl restart "$SERVICE_NAME" >/dev/null 2>&1; then
-    journalctl -u "$SERVICE_NAME" -n 30 --no-pager >&2 || true
+  if ! systemctl daemon-reload >/dev/null 2>&1; then
+    service_step='加载 systemd 配置'
+  elif ! systemctl enable "$SERVICE_NAME" >/dev/null 2>&1; then
+    service_step='设置开机启动'
+  elif ! systemctl restart "$SERVICE_NAME" >/dev/null 2>&1; then
+    service_step='重启服务'
+  fi
+  if [[ -n "$service_step" ]]; then
+    journalctl -u "$SERVICE_NAME" -n 30 --no-pager >"${work_dir}/service-failure.log" 2>&1 || true
+    show_error_log "${work_dir}/service-failure.log"
     rollback_backup "$backup_path"
-    die "服务启动失败，已回滚。"
+    die "${SERVICE_NAME} ${service_step}失败；恢复结果见上方。请执行 puppyip status 检查，勿直接重新安装。"
   fi
 
   sleep 1
   if ! systemctl is-active --quiet "$SERVICE_NAME"; then
-    journalctl -u "$SERVICE_NAME" -n 30 --no-pager >&2 || true
+    journalctl -u "$SERVICE_NAME" -n 30 --no-pager >"${work_dir}/service-failure.log" 2>&1 || true
+    show_error_log "${work_dir}/service-failure.log"
     rollback_backup "$backup_path"
-    die "服务没有保持运行，已回滚。"
+    die "${SERVICE_NAME} 启动后未保持运行；恢复结果见上方，请执行 puppyip status 检查配置和端口占用。"
   fi
   commit_runtime_layout
 }
@@ -2516,26 +2649,26 @@ deploy_model_change() {
   ensure_runtime_layout
   if ! backup_path="$(create_backup)"; then
     cleanup_runtime_layout_created_this_run
-    die "无法创建修改前备份，未修改现有服务。"
+    die "无法在 ${BACKUP_DIR} 创建完整修改前备份，未修改现有服务；请检查目录权限、源文件可读性及磁盘空间。"
   fi
   if ! atomic_install "${work_dir}/candidate-config.json" "$CONFIG_FILE" 0640 root "$RUNTIME_GROUP" \
     || ! atomic_install "${work_dir}/candidate-state.json" "$STATE_FILE" 0600 root root; then
     rollback_backup "$backup_path"
-    die "节点配置写入失败，已回滚。"
+    die "写入节点配置 ${CONFIG_FILE} 或状态 ${STATE_FILE} 失败；具体文件及恢复结果见上方提示。"
   fi
   if [[ "$manager_ready" == 'yes' ]]; then
     if ! atomic_install "${work_dir}/manager" "$MANAGER_BIN" 0755 root root \
       || ! atomic_install "${work_dir}/manager" "$LEGACY_MANAGER_BIN" 0755 root root; then
       rollback_backup "$backup_path"
-      die "管理命令更新失败，已回滚。"
+      die "更新管理命令 ${MANAGER_BIN} 或 ${LEGACY_MANAGER_BIN} 失败；具体文件及恢复结果见上方提示。"
     fi
   fi
   if [[ -n "$preview_file" ]]; then
     previous_int_trap="$(trap -p INT)"
-    trap 'trap "" INT; rollback_backup "$backup_path"; warn "操作已取消，节点修改已回滚。"; exit 130' INT
+    trap 'trap "" INT; rollback_backup "$backup_path"; warn "操作已取消；节点修改的恢复结果见上方提示。"; exit 130' INT
     if ! cat -- "$preview_file"; then
       rollback_backup "$backup_path"
-      die "节点链接显示失败，节点修改已回滚。"
+      die "输出本批节点链接和二维码失败；请检查终端输出，节点修改的恢复结果见上方提示。"
     fi
     # Allow terminal output to travel before restarting its possible proxy path.
     if [[ -t 1 ]]; then sleep 2; fi
@@ -2547,12 +2680,12 @@ deploy_model_change() {
   fi
   if ! systemctl restart "$SERVICE_NAME" >/dev/null 2>&1; then
     rollback_backup "$backup_path"
-    die "服务重启失败，节点修改已回滚。"
+    die "应用节点修改时重启 ${SERVICE_NAME} 失败；恢复结果见上方，请执行 puppyip status 检查。"
   fi
   sleep 1
   if ! systemctl is-active --quiet "$SERVICE_NAME"; then
     rollback_backup "$backup_path"
-    die "服务没有保持运行，节点修改已回滚。"
+    die "应用节点修改后 ${SERVICE_NAME} 未保持运行；恢复结果见上方，请执行 puppyip status 检查配置和端口。"
   fi
   commit_runtime_layout
 }
@@ -2632,7 +2765,7 @@ select_node_id() {
     return
   fi
   if [[ -z "$selector" ]]; then
-    [[ -t 0 ]] || die "存在多个节点，请在命令后指定编号。"
+    [[ -t 0 ]] || die "存在多个节点；请先执行 puppyip list 查看编号，再在命令后指定一个编号。"
     print_node_list_file "$file"
     if ! read -r -p '请输入节点编号: ' answer; then
       die "未读取到节点编号。"
@@ -2641,14 +2774,14 @@ select_node_id() {
   fi
   selector="${selector#\#}"
   if [[ "$selector" =~ ^[0-9]+$ ]]; then
-    selector_number="$((10#$selector))"
-    SELECTED_NODE_ID="$(jq -r --argjson number "$selector_number" \
-      '.nodes[] | select(.number == $number) | .id' "$file")"
+    selector_number="${selector#"${selector%%[!0]*}"}"
+    SELECTED_NODE_ID="$(jq -r --arg number "$selector_number" \
+      '.nodes[] | select((.number | tostring) == $number) | .id' "$file")"
   else
     SELECTED_NODE_ID="$(jq -r --arg id "$selector" \
       '.nodes[] | select(.id == $id) | .id' "$file")"
   fi
-  [[ -n "$SELECTED_NODE_ID" ]] || die "找不到节点：${selector}"
+  [[ -n "$SELECTED_NODE_ID" ]] || die "找不到指定节点；请执行 puppyip list 查看现有编号，再带正确编号重试。"
 }
 
 node_outbound_type() {
@@ -2803,24 +2936,40 @@ script_version_from_file() {
 }
 
 download_latest_manager() {
-  local output="$1" response commit size version version_count
+  local output="$1" response commit size version version_count curl_status
   local -a curl_options=(
     --fail --silent --show-error --location --retry 0
     --proto '=https' --proto-redir '=https' --tlsv1.2
     --connect-timeout 3 --max-time 5 --max-filesize "$MAX_INSTALLER_BYTES"
   )
-  response="$(curl "${curl_options[@]}" \
+  if response="$(curl "${curl_options[@]}" \
     -H 'Accept: application/vnd.github+json' \
     -H 'User-Agent: puppyip-xray-chain-installer' \
-    "${INSTALLER_API_URL}/git/ref/heads/${INSTALLER_BRANCH}" 2>/dev/null)" || return 1
-  commit="$(jq -er '.object.sha' <<<"$response" 2>/dev/null)" || return 1
-  [[ "$commit" =~ ^[0-9A-Fa-f]{40}$ ]] || return 1
-  if ! curl "${curl_options[@]}" --output "$output" \
+    "${INSTALLER_API_URL}/git/ref/heads/${INSTALLER_BRANCH}" 2>/dev/null)"; then
+    :
+  else
+    curl_status=$?
+    warn "获取 PuppyIP 最新提交失败（api.github.com，curl 代码 ${curl_status}：$(socks_probe_error_category "$curl_status")）；请检查 VPS 到 GitHub API 的网络后重试。"
+    return 1
+  fi
+  if ! commit="$(jq -er '.object.sha' <<<"$response" 2>/dev/null)" \
+    || [[ ! "$commit" =~ ^[0-9A-Fa-f]{40}$ ]]; then
+    warn "GitHub 最新提交响应格式无效（api.github.com）；未下载或执行新脚本，请稍后重试并检查网络响应是否被替换。"
+    return 1
+  fi
+  if curl "${curl_options[@]}" --output "$output" \
     "${INSTALLER_RAW_BASE}/${commit,,}/install.sh" 2>/dev/null; then
+    :
+  else
+    curl_status=$?
+    warn "下载 PuppyIP 更新脚本失败（raw.githubusercontent.com，curl 代码 ${curl_status}：$(socks_probe_error_category "$curl_status")）；请检查该域名的网络访问及临时目录空间后重试。"
     rm -f -- "$output"
     return 1
   fi
-  [[ -f "$output" && ! -L "$output" ]] || return 1
+  if [[ ! -f "$output" || -L "$output" ]]; then
+    warn "更新脚本文件校验失败：下载结果不是普通文件；请检查临时目录权限，未执行更新。"
+    return 1
+  fi
   size="$(wc -c <"$output" | tr -d '[:space:]')" || return 1
   version="$(script_version_from_file "$output")" || return 1
   version_count="$(grep -c '^SCRIPT_VERSION=' "$output" || true)"
@@ -2828,6 +2977,7 @@ download_latest_manager() {
     || [[ "$version_count" != '1' || ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] \
     || ! grep -q '^# XRAY_CHAIN_SCRIPT$' "$output" \
     || ! bash -n "$output" 2>/dev/null; then
+    warn "下载的 PuppyIP 脚本未通过完整性、版本格式或 Bash 语法校验；未执行更新，请检查网络后重新运行，勿跳过校验。"
     rm -f -- "$output"
     return 1
   fi
@@ -2843,7 +2993,7 @@ maybe_update_manager() {
   work_dir="$LAST_TEMP_DIR"
   candidate="${work_dir}/latest-manager.sh"
   if ! download_latest_manager "$candidate"; then
-    die "更新检查或脚本下载校验失败，已停止本次菜单操作；请检查网络后重新输入 puppyip。"
+    die "PuppyIP 更新检查失败，已停止本次菜单操作；具体阶段和原因见上方，处理后重新输入 puppyip。"
   fi
   version="$(script_version_from_file "$candidate")"
   if ! semantic_version_is_newer "$version" "$SCRIPT_VERSION"; then
@@ -2861,7 +3011,7 @@ maybe_update_manager() {
   # A separate shell keeps errexit and rollback active inside the updater.
   bash "$candidate" upgrade || upgrade_status=$?
   if (( upgrade_status != 0 )); then
-    die "自动更新未完整成功，已停止本次菜单操作；请根据上方错误修复后重试。"
+    die "PuppyIP ${version} 自动更新失败（退出码 ${upgrade_status}），已停止本次菜单操作；请根据上方错误及恢复结果修复后重试。"
   fi
   if [[ "$(installed_state_version)" != "$version" \
     || "$(installed_manager_version "$MANAGER_BIN")" != "$version" \
@@ -3047,7 +3197,7 @@ command_install() {
 prepare_existing_operation() {
   local work_dir="$1"
   [[ -r "$STATE_FILE" && -r "$CONFIG_FILE" ]] || die "PuppyIP Chain 尚未安装。"
-  stage_installed_xray "$work_dir" || die "现有 Xray-core 或 Geo 数据不完整，请先执行 puppyip update。"
+  stage_installed_xray "$work_dir" || die "读取或复制现有 Xray-core/Geo 数据失败；请检查 ${XRAY_BIN} 和 ${ASSET_DIR} 下的 geoip.dat、geosite.dat，以及磁盘空间。请先保留备份并恢复缺失组件，勿直接重新安装覆盖节点。"
   load_model "$work_dir" "${work_dir}/xray/xray"
 }
 
@@ -3344,8 +3494,21 @@ socks_probe_error_category() {
   esac
 }
 
+socks_probe_error_advice() {
+  case "$1" in
+    0) printf '检查出口响应是否被认证页或拦截页替换' ;;
+    5|6) printf '检查 DNS 与目标地址拼写后重试' ;;
+    7) printf '检查目标地址、端口与服务是否可达' ;;
+    28) printf '检查目标连通性与出口网络后重试' ;;
+    35|51|58|59|60|64|66|77|80|82|83|90|91) printf '检查系统时间、CA 证书及出口 TLS 连接' ;;
+    67|97) printf '检查代理协议、认证信息及上游服务' ;;
+    22) printf '稍后重试，并检查出口能否访问检测站' ;;
+    *) printf '根据 curl 代码检查请求环境后重试' ;;
+  esac
+}
+
 probe_ipv4_with_curl_config() {
-  local config_path="$1" diagnostic_path="${2:-}" endpoint result curl_status attempt=0
+  local config_path="$1" diagnostic_path="${2:-}" endpoint domain result curl_status attempt=0
   local -a endpoints=(
     'https://api.ipify.org'
     'https://ipv4.icanhazip.com'
@@ -3372,8 +3535,11 @@ probe_ipv4_with_curl_config() {
       return 0
     fi
     if [[ -n "$diagnostic_path" ]]; then
-      printf '  检测点 %s/3：%s（curl 代码 %s）\n' "$attempt" \
-        "$(socks_probe_error_category "$curl_status")" "$curl_status" >>"$diagnostic_path" || return 1
+      domain="${endpoint#https://}"
+      domain="${domain%%/*}"
+      printf '  检测点 %s/3 %s：%s（curl 代码 %s）；建议：%s。\n' "$attempt" "$domain" \
+        "$(socks_probe_error_category "$curl_status")" "$curl_status" \
+        "$(socks_probe_error_advice "$curl_status")" >>"$diagnostic_path" || return 1
     fi
   done
   return 1
@@ -3382,43 +3548,47 @@ probe_ipv4_with_curl_config() {
 write_status_probe_result() {
   local result_file="$1" status="$2" exit_ip="${3:-}"
   printf '%s\n%s\n' "$status" "$exit_ip" >"$result_file"
+  if (( $# > 3 )); then printf '%s\n' "${@:4}" >>"$result_file"; fi
   chmod 0600 "$result_file"
 }
 
 probe_status_node() {
   local node_id="$1" node_type="$2" schema="$3" work_dir="$4" result_file="$5"
-  local tag outbound address port user password proxy_host config_path detected_ip=''
-  write_status_probe_result "$result_file" failed
-
-  if [[ "$node_type" == 'direct' ]]; then
-    detected_ip="$(detect_public_ipv4 || true)"
-    if valid_ipv4 "$detected_ip"; then
-      write_status_probe_result "$result_file" ok "$detected_ip"
-    fi
-    return 0
-  fi
-
-  if [[ "$schema" == '2' ]]; then
-    tag="socks-out-${node_id}"
-  else
-    tag='socks-out'
-  fi
-  outbound="$(jq -cer --arg tag "$tag" \
-    '.outbounds[] | select(.tag == $tag)' "$CONFIG_FILE" 2>/dev/null)" || return 0
-  address="$(jq -er '.settings.address' <<<"$outbound" 2>/dev/null)" || return 0
-  port="$(jq -er '.settings.port' <<<"$outbound" 2>/dev/null)" || return 0
-  user="$(jq -r '.settings.user // ""' <<<"$outbound" 2>/dev/null)" || return 0
-  password="$(jq -r '.settings.pass // ""' <<<"$outbound" 2>/dev/null)" || return 0
-  valid_ipv4_or_domain "$address" || return 0
-  valid_port "$port" || return 0
-  [[ ! "$user" =~ [[:cntrl:]] && ! "$password" =~ [[:cntrl:]] ]] || return 0
-  [[ -z "$user" || -n "$password" ]] || return 0
-
-  proxy_host="$address"
-  [[ "$proxy_host" == *:* ]] && proxy_host="[${proxy_host}]"
+  local tag outbound address port user='' password='' proxy_host config_path diagnostic_path target detected_ip=''
   config_path="${work_dir}/status-${node_id}.curl"
+  diagnostic_path="${work_dir}/status-${node_id}.diagnostic"
+  if [[ "$node_type" == 'direct' ]]; then
+    target='VPS 本机直连'
+  else
+    if [[ "$schema" == '2' ]]; then tag="socks-out-${node_id}"; else tag='socks-out'; fi
+    write_status_probe_result "$result_file" failed '' \
+      "配置读取失败：${CONFIG_FILE} 中缺少或无法读取出口 ${tag}。" \
+      '建议：先核对该线路的出口配置或恢复已验证的备份，再重新检查状态。'
+    outbound="$(jq -cer --arg tag "$tag" \
+      '.outbounds[] | select(.tag == $tag)' "$CONFIG_FILE" 2>/dev/null)" || return 0
+    write_status_probe_result "$result_file" failed '' \
+      "配置字段无效：${CONFIG_FILE} 中出口 ${tag} 的地址、端口或认证字段不完整。" \
+      '建议：检查该线路的 SOCKS5 地址、端口和认证字段；状态检测未修改配置。'
+    address="$(jq -er '.settings.address' <<<"$outbound" 2>/dev/null)" || return 0
+    port="$(jq -er '.settings.port' <<<"$outbound" 2>/dev/null)" || return 0
+    user="$(jq -r '.settings.user // ""' <<<"$outbound" 2>/dev/null)" || return 0
+    password="$(jq -r '.settings.pass // ""' <<<"$outbound" 2>/dev/null)" || return 0
+    valid_ipv4_or_domain "$address" || return 0
+    valid_port "$port" || return 0
+    [[ ! "$user" =~ [[:cntrl:]] && ! "$password" =~ [[:cntrl:]] ]] || return 0
+    [[ -z "$user" || -n "$password" ]] || return 0
+    proxy_host="$address"
+    [[ "$proxy_host" == *:* ]] && proxy_host="[${proxy_host}]"
+    target="SOCKS5 ${proxy_host}:${port}"
+  fi
+  write_status_probe_result "$result_file" failed '' "检测出口：${target}" \
+    '未取得有效检测结果；建议检查本机运行环境后重新执行 puppyip status。'
   {
-    printf 'proxy = "socks5h://%s:%s"\n' "$(curl_config_escape "$proxy_host")" "$port"
+    if [[ "$node_type" == 'direct' ]]; then
+      printf 'proxy = ""\nnoproxy = "*"\n'
+    else
+      printf 'proxy = "socks5h://%s:%s"\n' "$(curl_config_escape "$proxy_host")" "$port"
+    fi
     if [[ -n "$user" ]]; then
       printf 'proxy-user = "%s:%s"\n' \
         "$(curl_config_escape "$user")" "$(curl_config_escape "$password")"
@@ -3427,16 +3597,19 @@ probe_status_node() {
   } >"$config_path"
   chmod 0600 "$config_path"
 
-  if detected_ip="$(probe_ipv4_with_curl_config "$config_path")" \
+  if detected_ip="$(probe_ipv4_with_curl_config "$config_path" "$diagnostic_path")" \
     && valid_ipv4 "$detected_ip"; then
     write_status_probe_result "$result_file" ok "$detected_ip"
+  elif [[ -s "$diagnostic_path" ]]; then
+    write_status_probe_result "$result_file" failed '' "检测出口：${target}"
+    cat -- "$diagnostic_path" >>"$result_file"
   fi
-  rm -f -- "$config_path" || true
+  rm -f -- "$config_path" "$diagnostic_path" || true
 }
 
 show_status_node_health() {
   local schema="$1" work_dir="$2" unavailable_reason="${3:-}"
-  local node_id node_port pid completed=0 total_enabled=0 status detected_ip expected_ip
+  local node_id node_port pid completed=0 total_enabled=0 status detected_ip expected_ip detail
   local -a node_ids=() running_pids=() result_lines=()
   local -A numbers=() names=() types=() enabled=() expected=() result_files=()
   local -A ports=() port_ready=()
@@ -3537,6 +3710,8 @@ show_status_node_health() {
     fi
     if [[ "${port_ready[${ports[$node_id]}]}" != 'yes' ]]; then
       printf '     状态：不可用（入口端口未监听）\n'
+      printf '     建议：运行 ss -lntp 检查 %s/tcp，并用 journalctl -u %s -n 50 --no-pager 查看服务启动原因。\n' \
+        "${ports[$node_id]}" "$SERVICE_NAME"
       continue
     fi
     result_lines=()
@@ -3552,28 +3727,39 @@ show_status_node_health() {
       else
         printf '     出口 IP：%s · 正常\n' "$detected_ip"
       fi
-    elif [[ "${types[$node_id]}" == 'direct' ]]; then
-      printf '     出口检测：失败（VPS 网络异常或检测站不可达）\n'
     else
-      printf '     出口检测：失败（请检查 SOCKS5、白名单或网络）\n'
+      printf '     出口检测：失败\n'
+      if (( ${#result_lines[@]} > 2 )); then
+        for detail in "${result_lines[@]:2}"; do printf '     %s\n' "$detail"; done
+      else
+        printf '     未取得检测结果；建议检查本机运行环境后重新执行 puppyip status。\n'
+      fi
     fi
   done
 }
 
 command_status() {
   local version_output node_count enabled_count paused_count port service_state service_label
-  local validation_log tcp_cc default_qdisc schema config_valid='no'
+  local validation_log tcp_cc default_qdisc schema config_valid='no' command_code
   local unavailable_reason='' work_dir entry_label=''
   local -a ports=()
   require_root
-  [[ -x "$XRAY_BIN" && -r "$CONFIG_FILE" && -r "$STATE_FILE" ]] || die "PuppyIP Chain 尚未安装。"
-  if ! version_output="$($XRAY_BIN version 2>/dev/null)"; then
-    die "Xray 程序无法运行，未执行线路检测。"
+  [[ -e "$STATE_FILE" ]] || die "状态文件不存在：${STATE_FILE}。请核对安装目录或恢复已验证的备份；未执行线路检测。"
+  [[ -f "$STATE_FILE" && -r "$STATE_FILE" ]] || die "状态文件不可读：${STATE_FILE}。请检查文件类型、属主与读取权限；未执行线路检测。"
+  [[ -e "$CONFIG_FILE" ]] || die "Xray 配置文件不存在：${CONFIG_FILE}。请核对安装目录或恢复已验证的备份；未执行线路检测。"
+  [[ -f "$CONFIG_FILE" && -r "$CONFIG_FILE" ]] || die "Xray 配置文件不可读：${CONFIG_FILE}。请检查文件类型、属主与读取权限；未执行线路检测。"
+  [[ -e "$XRAY_BIN" ]] || die "Xray 程序不存在：${XRAY_BIN}。请核对安装目录并修复核心程序；未执行线路检测。"
+  [[ -f "$XRAY_BIN" && -x "$XRAY_BIN" ]] || die "Xray 程序不可执行：${XRAY_BIN}。请检查文件类型和执行权限；未执行线路检测。"
+  if version_output="$($XRAY_BIN version 2>/dev/null)"; then
+    :
+  else
+    command_code=$?
+    die "Xray 程序运行失败：${XRAY_BIN}（退出码 ${command_code}）。请检查程序架构、运行库及文件权限；未执行线路检测。"
   fi
   schema="$(jq -er '.schema // 1' "$STATE_FILE" 2>/dev/null)" \
-    || die "状态文件无法读取，未执行线路检测。"
+    || die "状态文件无法解析：${STATE_FILE}。请检查 JSON 格式或恢复已验证的备份；未执行线路检测。"
   status_state_is_valid "$schema" \
-    || die "状态文件不完整，无法可靠检测线路。"
+    || die "状态文件格式不受支持或节点字段不完整：${STATE_FILE}。请核对版本及节点字段或恢复已验证的备份；未执行线路检测。"
   if [[ "$schema" == '2' ]]; then
     node_count="$(jq '.nodes | length' "$STATE_FILE")"
     enabled_count="$(jq '[.nodes[] | select(.enabled != false)] | length' "$STATE_FILE")"
@@ -3614,10 +3800,20 @@ command_status() {
     config_valid='yes'
     printf '  配置：正常\n'
   else
-    printf '  配置：异常\n'
+    command_code=$?
+    printf '  配置：异常（配置校验失败，退出码 %s）\n' "$command_code"
+    printf '  文件：%s\n  建议：检查配置字段、文件权限与核心版本，或恢复已验证的备份；本次未改配置。\n' "$CONFIG_FILE"
   fi
   if [[ "$service_state" != 'active' ]]; then
     unavailable_reason='服务未运行'
+    printf '  服务单元：%s\n' "$SERVICE_NAME"
+    case "$service_state" in
+      inactive) printf '  建议：服务当前已停止；先确认是否主动停用，再查看启动记录。\n' ;;
+      failed) printf '  建议：服务启动或运行失败；先查看错误记录，修复后再手动启动。\n' ;;
+      *) printf '  建议：无法确认服务正在运行；先检查服务单元是否存在及 systemd 状态。\n' ;;
+    esac
+    printf '  查看命令：systemctl status %s --no-pager；journalctl -u %s -n 50 --no-pager\n' \
+      "$SERVICE_NAME" "$SERVICE_NAME"
   elif [[ "$config_valid" != 'yes' ]]; then
     unavailable_reason='配置校验失败'
   fi

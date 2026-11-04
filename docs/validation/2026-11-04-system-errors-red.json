@@ -1,0 +1,33 @@
+{
+  "schema": 1,
+  "kind": "diagnostic_regression_red_baseline",
+  "recorded_at_utc": "2026-11-04T10:33:02.0133610+00:00",
+  "source_version": "0.2.22",
+  "source_sha256": "0d5e6295ed05046d777fafad0ffb87b6b4bea8248a471b933c8110be938406ca",
+  "test_sha256": "311241709c7bc0cf260ddb98e6776ddcbac27630c9d70526d69ce2fa4fd972ad",
+  "result": "expected_red",
+  "cases": [
+    "test_log_redaction",
+    "test_unknown_log_redaction",
+    "test_atomic_write_failure",
+    "test_atomic_replace_failure",
+    "test_ref_network_failure",
+    "test_ref_invalid_response",
+    "test_script_network_failure",
+    "test_script_invalid_response",
+    "test_incomplete_rollback",
+    "test_successful_rollback",
+    "test_oversized_port_input",
+    "test_invalid_ipv4_input",
+    "test_oversized_node_selector"
+  ],
+  "failed_case_count": 13,
+  "runner_exit_code": 1,
+  "environment": "isolated WSL; unshare --net",
+  "scope": "Real diagnostic, validation and rollback functions invoked with synthetic files and mocked failures",
+  "exclusions": [
+    "No production server, credentials, config or external network accessed",
+    "No raw log content retained in this report",
+    "No historical failure experiment repeated; new tests target newly authorized diagnostic behavior"
+  ]
+}

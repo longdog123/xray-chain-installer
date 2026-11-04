@@ -11,6 +11,9 @@ bash -n "${ROOT_DIR}/tests/port-change.sh"
 bash -n "${ROOT_DIR}/tests/auto-update.sh"
 bash -n "${ROOT_DIR}/tests/address-refresh.sh"
 bash -n "${ROOT_DIR}/tests/socks-verification.sh"
+bash -n "${ROOT_DIR}/tests/error-context.sh"
+bash -n "${ROOT_DIR}/tests/status-errors.sh"
+bash -n "${ROOT_DIR}/tests/system-errors.sh"
 [[ ! -f "${ROOT_DIR}/tests/preflight.sh" ]] || bash -n "${ROOT_DIR}/tests/preflight.sh"
 
 bash -c '
@@ -528,7 +531,7 @@ JSON
 
   direct_result_file="$status_fixture_dir/normal/direct.result"
   (
-    detect_public_ipv4() { printf "192.0.2.44"; }
+    curl() { printf "192.0.2.44"; }
     probe_status_node node-3 direct 2 "$status_fixture_dir/normal" "$direct_result_file"
   )
   mapfile -t direct_result <"$direct_result_file"
@@ -550,7 +553,9 @@ JSON
     curl() { return 1; }
     show_status_node_health 2 "$status_fixture_dir/failed" ""
   )"
-  [[ "$failed_output" == *"出口检测：失败（请检查 SOCKS5、白名单或网络）"* ]]
+  [[ "$failed_output" == *"出口检测：失败"* ]]
+  [[ "$failed_output" == *"检测出口：SOCKS5 203.0.113.10:1080"* ]]
+  [[ "$failed_output" == *"api.ipify.org"* && "$failed_output" == *"curl 代码 1"* ]]
 
   unavailable_output="$(
     interactive_progress_enabled() { return 1; }

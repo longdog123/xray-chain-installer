@@ -1,0 +1,96 @@
+{
+  "schema_version": 1,
+  "kind": "isolated-status-diagnostics",
+  "recorded_at": "2026-11-04T10:35:29.442115+00:00",
+  "runs": [
+    {
+      "phase": "red",
+      "started_at": "2026-11-04T10:29:03.966838+00:00",
+      "completed_at": "2026-11-04T10:29:04.613653+00:00",
+      "source_sha256": "0bdf126bcded0575bd07e960310fc8b5cd727dbef2e2f15233c33a3558a87774",
+      "test_sha256": "dee7fab99a798ea6669ef280317066015a51638467c18ea0cc2ba0918e84505c",
+      "command": "bash tests/status-errors.sh probe-errors missing-state invalid-config inactive",
+      "exit_code": 1,
+      "results": [
+        "FAIL: missing-state: failure has no actionable next step",
+        "FAIL: invalid-config: status exposed credentials, raw diagnostic or a failed response body",
+        "FAIL: inactive: failure has no actionable next step",
+        "Status diagnostic checks failed: 4/4"
+      ],
+      "passed": 0,
+      "failed": 4,
+      "observed_failure_causes": {
+        "probe-errors": "A failed node did not identify its actual outbound target; confirmed by a focused rerun.",
+        "missing-state": "No actionable next step was printed.",
+        "invalid-config": "The raw Xray validation log exposed the synthetic sensitive marker.",
+        "inactive": "No actionable next step was printed."
+      }
+    },
+    {
+      "phase": "green",
+      "started_at": "2026-11-04T10:34:15.224249+00:00",
+      "completed_at": "2026-11-04T10:34:20.023066+00:00",
+      "source_sha256": "ccd0bffc7a312960b2741f73b97885b2bef92eb3b907d498ab6874c3a1901049",
+      "test_sha256": "b172d3dfeb0db4c5557dfd321cee8120e12707b376dcff53eb3477cac813a542",
+      "static_test_sha256": "89e3c735c2b7671d3eebbabc2963e1ff1083b9fa449b52aece15e40ea968dcc7",
+      "command": "bash -n install.sh && bash -n tests/status-errors.sh && bash tests/status-errors.sh && bash tests/static.sh",
+      "exit_code": 0,
+      "results": [
+        "PASS: probe-errors",
+        "PASS: normal",
+        "PASS: mismatch",
+        "PASS: direct-environment",
+        "PASS: missing-state",
+        "PASS: missing-config",
+        "PASS: missing-core",
+        "PASS: core-failure",
+        "PASS: invalid-state",
+        "PASS: invalid-schema",
+        "PASS: invalid-config",
+        "PASS: inactive",
+        "PASS: failed",
+        "PASS: unknown-service",
+        "PASS: unlistening",
+        "PASS: missing-outbound",
+        "PASS: invalid-outbound",
+        "Status diagnostic checks passed: 17 cases.",
+        "静态检查通过。"
+      ],
+      "passed": 17,
+      "failed": 0,
+      "static_checks": "passed"
+    }
+  ],
+  "verified_scope": [
+    "Real command_status, show_status_node_health, probe_status_node and shared IPv4 probe helper, with local synthetic state/config/core files.",
+    "Failure identifies its node, actual SOCKS address and port or direct outbound, each probe site, safe curl classification/code and an actionable next step.",
+    "Concurrent node-specific result files do not mix diagnoses; successful, mismatch and paused node output remains exactly as before.",
+    "Missing state/config/core, invalid JSON/schema, failing core, rejected Xray configuration, inactive/failed/unknown service and unlistening inbound port receive specific diagnostics.",
+    "Missing or invalid outbound fields fail locally before network probing.",
+    "No saved file bytes change; no confirmation or service mutation occurs; raw stderr, synthetic credentials and unsuccessful response bodies are not displayed.",
+    "Direct probing explicitly disables ambient proxies, SOCKS probing keeps private curl configs, and probes retain three endpoints with 4-second connection and 6-second total limits.",
+    "Successful probes stop at one endpoint; paused and unavailable nodes make zero network requests."
+  ],
+  "boundary_stubs": [
+    "curl",
+    "systemctl is-active",
+    "status_tcp_port_is_listening",
+    "read_sysctl_value",
+    "require_root",
+    "interactive_progress_enabled",
+    "synthetic Xray executable",
+    "confirmation guard"
+  ],
+  "cleanup": {
+    "completed_at": "2026-11-04T10:35:29.442115+00:00",
+    "per_case_fixtures": "Automatically removed by TemporaryDirectory.",
+    "isolated_snapshot": "Removed and absence verified.",
+    "customer_files_modified": false
+  },
+  "exclusions": [
+    "No actual network, real SOCKS endpoint, production server, customer configuration or operating-system service was contacted.",
+    "Full curl configs, passwords, complete node links and raw logs are not retained in this report.",
+    "This records the exact source snapshot tested; concurrent changes outside the status scope are covered by the separate final regression run.",
+    "ShellCheck was not installed in this WSL environment; Bash syntax validation and the static suite passed."
+  ]
+}

@@ -1,0 +1,53 @@
+{
+  "schema": 1,
+  "kind": "isolated-socks-error-context",
+  "baseline_source_sha256": "0bdf126bcded0575bd07e960310fc8b5cd727dbef2e2f15233c33a3558a87774",
+  "source_sha256": "8e83f90329fa50681f0e86016784d0edbe0be752d02f369854caae4b50139b2c",
+  "test_sha256": {
+    "tests/error-context.sh": "b81201322f6b104e17ad7468e0ba590a29efb208c5268296869fe2c923143093",
+    "tests/socks-verification.sh": "817b27d979b71717c3347a6cdc20fae7cde337e4ab5eaffb32bec8cfc327800d"
+  },
+  "runs": [
+    {
+      "phase": "red-baseline",
+      "test": "error-context",
+      "started_at": "2026-11-04T10:31:50.047847+00:00",
+      "completed_at": "2026-11-04T10:31:50.256838+00:00",
+      "syntax_exit_code": 0,
+      "exit_code": 1,
+      "sanitized_output": "FAIL: batch-last-cancel: missing exact batch ordinal or gateway\nSOCKS error context checks failed: 1/1\n"
+    },
+    {
+      "phase": "green",
+      "test": "error-context",
+      "started_at": "2026-11-04T10:31:50.257444+00:00",
+      "completed_at": "2026-11-04T10:31:50.942134+00:00",
+      "syntax_exit_code": 0,
+      "exit_code": 0,
+      "sanitized_output": "PASS: batch-last-cancel\nPASS: batch-last-allow\nPASS: batch-last-noninteractive\nPASS: input-batch\nPASS: input-unsafe\nPASS: input-edit\nPASS: edit-failure\nPASS: single-failure\nSOCKS error context checks passed: 8 cases.\n"
+    },
+    {
+      "phase": "green",
+      "test": "socks-verification",
+      "started_at": "2026-11-04T10:31:50.942895+00:00",
+      "completed_at": "2026-11-04T10:31:54.112807+00:00",
+      "syntax_exit_code": 0,
+      "exit_code": 0,
+      "sanitized_output": "PASS: success\nPASS: fallback-second\nPASS: fallback-third\nPASS: failed-body-fallback\nPASS: dns-proxy\nPASS: dns-target\nPASS: connection\nPASS: timeout\nPASS: tls-handshake\nPASS: tls-certificate\nPASS: proxy-handshake\nPASS: authentication\nPASS: http-error\nPASS: invalid-body\nPASS: empty-body\nPASS: trailing-dot\nPASS: embedded-whitespace\nPASS: surrounding-whitespace\nPASS: nonzero-body\nPASS: environment\nPASS: allow-unverified\nPASS: saved-old\nPASS: saved-new\nPASS: helper-failed-body\nPASS: helper-silent-failure\nPASS: helper-success\nSOCKS verification checks passed: 26 cases.\n"
+    }
+  ],
+  "cleanup": "TemporaryDirectory removed",
+  "coverage": [
+    "Real batch order including failure at entry 11 of 11 with one repeated gateway and distinct synthetic accounts",
+    "PTY progress line, Enter/default refusal and explicit approval preserve existing flow",
+    "Noninteractive default refusal, selected edit node, safe malformed input context",
+    "Detection domain, error classification and next-step diagnostics; successful fallback stays quiet",
+    "No credentials, arbitrary node names, full links or raw curl stderr in output"
+  ],
+  "network": "unshare --net; curl mocked; no real network endpoints",
+  "exclusions": [
+    "No production server touched",
+    "Existing append/deploy boundary is mocked in new context test; full deployment behavior is covered separately",
+    "Source snapshot may precede unrelated parallel changes; final combined regression evidence is maintained separately"
+  ]
+}

@@ -1,0 +1,112 @@
+{
+  "schema": 1,
+  "kind": "isolated_regression_tests",
+  "installer_version": "0.2.23",
+  "started_at_utc": "2026-11-04T10:43:25.253129+00:00",
+  "source_base_commit": "7767e5fd60dccc0963f3587219dcf0f99b6931a2",
+  "source_snapshot_has_uncommitted_changes": true,
+  "source_sha256": "f777a50d9d5b59614e1fb07bf0ea31e62b4e4e5546532277ebd423492a65ed0b",
+  "runtime_version": "Xray 26.3.27 (Xray, Penetrates Everything.) d2758a0 (go1.26.1 linux/amd64)",
+  "runtime_files_sha256": {
+    "xray": "8255dd939c34cf966cc91517b6324dd3c8d0bcf49ffac8beca049a38c46845ed",
+    "geoip.dat": "744c97b74c52bae2ac8664fef6ac481d7765cb8432a0df54f0368a88b9b4a354",
+    "geosite.dat": "adf92de0cfc70e458b399f04c5f912bf42d115ed7e37281b30e2f1c68605e4e9"
+  },
+  "runtime_reused_from": "2026-11-04-address-refresh-regressions.json",
+  "reason": "Follow-up fix retains metadata-only first-install backup after an incomplete rollback; only rollback-related suites are rerun.",
+  "previous_behavior_evidence": "2026-11-04-error-diagnostics-regressions.json",
+  "environment": {
+    "os": "Ubuntu 24.04 LTS on isolated WSL",
+    "architecture": "x86_64",
+    "network": "Every suite runs under unshare --net; no external network access",
+    "shellcheck_available": false
+  },
+  "results": [
+    {
+      "suite": "tests/system-errors.sh",
+      "started_at_utc": "2026-11-04T10:43:25.257725+00:00",
+      "completed_at_utc": "2026-11-04T10:43:25.439448+00:00",
+      "elapsed_seconds": 0.182,
+      "exit_code": 0,
+      "status": "passed",
+      "timed_out": false,
+      "test_sha256": "07b603546e3b856c1bd726707479c98d10746e19ce2320f6ced0e4df6fda8cf0",
+      "source_sha256_unchanged": true
+    },
+    {
+      "suite": "tests/rollback.sh",
+      "started_at_utc": "2026-11-04T10:43:25.439897+00:00",
+      "completed_at_utc": "2026-11-04T10:43:26.029625+00:00",
+      "elapsed_seconds": 0.59,
+      "exit_code": 0,
+      "status": "passed",
+      "timed_out": false,
+      "test_sha256": "a76d3dd8508f2b97ea4b22994e88de758de80c7a07a1a03351a2b5f4fde6c5e0",
+      "source_sha256_unchanged": true
+    },
+    {
+      "suite": "tests/add-preview.sh",
+      "started_at_utc": "2026-11-04T10:43:26.030013+00:00",
+      "completed_at_utc": "2026-11-04T10:43:36.809981+00:00",
+      "elapsed_seconds": 10.78,
+      "exit_code": 0,
+      "status": "passed",
+      "timed_out": false,
+      "test_sha256": "cb11fa9c8c812c1602a4254ab2efdd005d9639cb458bf9c0e488f417d17ba34a",
+      "source_sha256_unchanged": true
+    }
+  ],
+  "completed_at_utc": "2026-11-04T10:43:36.811916+00:00",
+  "passed": true,
+  "cleanup": {
+    "new_fixture_directory_count": 0,
+    "checked_fixture_name_patterns": [
+      "xray-chain-test.*",
+      "xray-chain-rollback-test.*",
+      "xray-chain-port-test.*",
+      "xray-chain.autoupdate-test.*",
+      "xray-chain-add-preview.*",
+      "xray-chain-auto-update.*",
+      "puppyip-socks-verification.*",
+      "xray-chain.*"
+    ],
+    "snapshot_and_verified_runtime_retained": true,
+    "raw_test_logs_excluded_from_public_report": true,
+    "previous_run_directories": "Earlier temporary directories were not modified; before/after counts refer only to this focused run"
+  },
+  "exclusions": [
+    "No production deployment, credentials, configuration or customer data",
+    "No real provider IP replacement",
+    "No external client reachability, DNS, cloud firewall or NAT test",
+    "This focused run does not exercise the Xray engine; full compatibility evidence is retained in the earlier eleven-suite report",
+    "No commit, publication or deployment performed by this runner"
+  ],
+  "source_snapshot_hashes": {
+    "install.sh": "f777a50d9d5b59614e1fb07bf0ea31e62b4e4e5546532277ebd423492a65ed0b",
+    "tests/add-preview.sh": "cb11fa9c8c812c1602a4254ab2efdd005d9639cb458bf9c0e488f417d17ba34a",
+    "tests/address-refresh.sh": "420e2ca0368d457b8fed12a14d57eda90751e40cede90bf8b877f1692b0d78e4",
+    "tests/auto-update.sh": "23cdbaf20a4ad10761c03dc1a7a02aeb6efe49b49e7669c95bb3420fa679d6d2",
+    "tests/error-context.sh": "b81201322f6b104e17ad7468e0ba590a29efb208c5268296869fe2c923143093",
+    "tests/integration.sh": "8ab89bc9778efa9402bdf43fa956b7e70b3c4a377fd433b6d4ade25f2beab697",
+    "tests/port-change.sh": "3aabe799e1d7c8239aaac4be1a3d05027a80d87036a41adafb2f026ba4fa0ca9",
+    "tests/preflight.sh": "6e07f3ca04956161c90c83243f8bba5d2f98cd6a13d45c9a99301af7245e46e4",
+    "tests/rollback.sh": "a76d3dd8508f2b97ea4b22994e88de758de80c7a07a1a03351a2b5f4fde6c5e0",
+    "tests/socks-verification.sh": "817b27d979b71717c3347a6cdc20fae7cde337e4ab5eaffb32bec8cfc327800d",
+    "tests/static.sh": "12f00263ddc4a2323d1307bfa990d377f600a5bcdd065b61af0abcff9faf2543",
+    "tests/status-errors.sh": "b172d3dfeb0db4c5557dfd321cee8120e12707b376dcff53eb3477cac813a542",
+    "tests/system-errors.sh": "07b603546e3b856c1bd726707479c98d10746e19ce2320f6ced0e4df6fda8cf0"
+  },
+  "tested_files_match_worktree_at_completion": true,
+  "delta_from_full_regression": "The only production-code change after the eleven-suite pass moves cleanup_runtime_layout_created_this_run into the rollback-result branches: incomplete recovery omits backup_path, successful recovery supplies it; return status and account cleanup remain unchanged.",
+  "prior_full_suite_source_sha256": "e7e178c471a3e885e51506752a2de9b6bddc67310d3d2137020674ecde9f63a9",
+  "red_baseline": {
+    "source_sha256": "e7e178c471a3e885e51506752a2de9b6bddc67310d3d2137020674ecde9f63a9",
+    "test_sha256": "07b603546e3b856c1bd726707479c98d10746e19ce2320f6ced0e4df6fda8cf0",
+    "passed_existing_cases": 13,
+    "failed_new_case": "test_failed_fresh_rollback_preserves_backup",
+    "runner_exit_code": 1,
+    "result": "expected_red"
+  },
+  "snapshot_hash_scope": "Only the three suites in results were executed. Other copied test hashes describe snapshot contents and do not claim they were rerun after the localized rollback guard change.",
+  "timing_method": "elapsed_seconds uses time.monotonic around each suite subprocess; UTC endpoints use the system wall clock"
+}

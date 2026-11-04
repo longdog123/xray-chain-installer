@@ -148,14 +148,19 @@ with tempfile.TemporaryDirectory(prefix="puppyip-socks-verification.") as direct
             display = (root / "display").read_text() if (root / "display").exists() else ""
             combined = display + process.stdout.decode() + process.stderr.decode()
             require(not any(value in combined for value in
-                            ("198.51.100.77", "fixture-user", "fixture-password", "private diagnostic")),
-                    "diagnostics exposed the proxy endpoint, credentials or raw stderr")
+                            ("fixture-user", "fixture-password", "private diagnostic")),
+                    "diagnostics exposed credentials or raw stderr")
             if error_category == "silent":
                 require((root / "helper.stderr").read_bytes() == b"", "status probe failure became noisy")
             elif error_category:
                 require(error_category in display and "curl" in display,
                         "failure did not include a safe category and numeric curl code")
                 require(str(responses[0]["code"]) in display, "curl error code is missing")
+                require("198.51.100.77:1080" in display, "failed proxy endpoint is missing")
+                require(all(domain in display for domain in
+                            ("api.ipify.org", "ipv4.icanhazip.com", "ifconfig.me")),
+                        "failed detection sites are missing")
+                require("建议" in display, "failure next step is missing")
                 if scenario == "proxy-handshake":
                     require("密码错误" not in display, "curl 97 was misdiagnosed as a definite password error")
             else:
