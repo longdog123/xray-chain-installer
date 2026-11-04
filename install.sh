@@ -5,7 +5,7 @@
 set -Eeuo pipefail
 umask 077
 
-SCRIPT_VERSION="0.2.20"
+SCRIPT_VERSION="0.2.21"
 CURRENT_STATE_SCHEMA=2
 SERVICE_NAME="xray-chain.service"
 RUNTIME_USER="xray-chain"
@@ -2784,44 +2784,42 @@ download_latest_manager() {
 
 maybe_update_manager() {
   local work_dir candidate version upgrade_status=0 menu_status=0
-  [[ "${XRAY_CHAIN_AUTO_UPDATE:-1}" != '0' ]] || return 0
   info "正在检查 PuppyIP 管理脚本更新..."
   if ! new_temp_dir; then
-    warn "无法创建更新临时目录，继续打开本地管理菜单。"
-    return 0
+    die "无法创建更新临时目录，已停止本次菜单操作；请修复后重新输入 puppyip。"
   fi
   work_dir="$LAST_TEMP_DIR"
   candidate="${work_dir}/latest-manager.sh"
   if ! download_latest_manager "$candidate"; then
-    warn "更新检查或脚本下载校验失败，继续打开本地管理菜单。"
-    return 0
+    die "更新检查或脚本下载校验失败，已停止本次菜单操作；请检查网络后重新输入 puppyip。"
   fi
   version="$(script_version_from_file "$candidate")"
   if ! semantic_version_is_newer "$version" "$SCRIPT_VERSION"; then
-    info "当前管理脚本为 ${SCRIPT_VERSION}，无需更新。"
-    return 0
+    if ! installation_upgrade_needed; then
+      info "当前管理脚本为 ${SCRIPT_VERSION}，无需更新。"
+      return 0
+    fi
+    [[ "$version" == "$SCRIPT_VERSION" ]] \
+      || die "现有安装版本不一致，且远端脚本更旧；已停止操作以避免降级，请检查安装。"
+    info "当前版本为 ${version}，正在修复安装版本或状态不一致的问题。"
+  else
+    info "发现 PuppyIP ${version}，正在自动更新；现有节点和链接会保留。"
   fi
-  info "发现 PuppyIP ${version}，正在自动更新；现有节点和链接会保留。"
   warn "更新会重启 PuppyIP 服务；若 SSH 经过本机代理，连接可能中断。"
   # A separate shell keeps errexit and rollback active inside the updater.
   bash "$candidate" upgrade || upgrade_status=$?
+  if (( upgrade_status != 0 )); then
+    die "自动更新未完整成功，已停止本次菜单操作；请根据上方错误修复后重试。"
+  fi
   if [[ "$(installed_state_version)" != "$version" \
     || "$(installed_manager_version "$MANAGER_BIN")" != "$version" \
     || "$(installed_manager_version "$LEGACY_MANAGER_BIN")" != "$version" ]]; then
-    if (( upgrade_status != 0 )); then
-      warn "自动更新未成功，继续打开本地管理菜单。"
-    else
-      warn "自动更新结果未通过版本核对，继续打开本地管理菜单。"
-    fi
-    return 0
-  fi
-  if (( upgrade_status != 0 )); then
-    warn "新版脚本已安装，但更新收尾未完成；请查看上方错误提示。"
+    die "自动更新结果未通过版本核对，已停止本次菜单操作；请检查安装后重试。"
   fi
   info "正在进入 PuppyIP ${version} 管理菜单。"
   # The parent still has the old functions loaded. Run the installed copy once,
   # then exit so returning from its menu cannot reopen the old menu.
-  XRAY_CHAIN_AUTO_UPDATE=0 bash "$MANAGER_BIN" || menu_status=$?
+  bash "$MANAGER_BIN" --menu-after-update "$version" || menu_status=$?
   exit "$menu_status"
 }
 
@@ -2905,7 +2903,7 @@ command_upgrade() {
 }
 
 handle_existing_remote_run() {
-  local answer state_version
+  local state_version
   show_brand_banner
   require_root
   check_platform
@@ -2919,15 +2917,14 @@ handle_existing_remote_run() {
     return 0
   fi
 
-  info "发现旧版本 ${state_version}，可更新到 ${SCRIPT_VERSION}。"
+  info "正在将现有安装（${state_version}）更新到 PuppyIP Chain ${SCRIPT_VERSION}。"
   printf '现有节点和链接会保留。\n'
-  prompt_yes_no answer "是否更新到 PuppyIP Chain ${SCRIPT_VERSION}？" yes
-  if [[ "$answer" != 'yes' ]]; then
-    info "已取消更新，现有节点和服务未修改。"
-    show_management_hint
-    return 0
-  fi
+  warn "更新会重启 PuppyIP 服务；若 SSH 经过本机代理，连接可能中断。"
+  # Keep this direct call outside a conditional so upgrade failures remain fatal.
   command_upgrade
+  if installation_upgrade_needed; then
+    die "更新结果未通过版本核对，已停止操作，不会继续新增线路。"
+  fi
   info "继续添加新线路。"
   command_add
 }
@@ -3689,7 +3686,6 @@ usage() {
   XRAY_CHAIN_PORT=62001              指定首次安装的首节点端口；其余节点自动选择高位端口
   XRAY_CHAIN_UDP_MODE=block|proxy     新节点 UDP 策略；默认 proxy
   XRAY_CHAIN_ENABLE_BBR=1|0           自动启用 BBR；默认 1，设为 0 时不修改 TCP 参数
-  XRAY_CHAIN_AUTO_UPDATE=1|0          打开管理菜单时自动更新脚本；默认 1，设为 0 跳过
   XRAY_CHAIN_AUTO_ADDRESS=1|0         查看时自动使用当前本机公网 IP；固定数字中转入口设为 0
   XRAY_CHAIN_ALLOW_UNVERIFIED=1      非交互模式允许跳过失败的联网验证
 EOF
@@ -3702,9 +3698,50 @@ pause_menu() {
   refresh_brand_banner
 }
 
+run_management_menu() {
+  local command
+  while true; do
+    show_menu
+    if ! read -r -p '请选择要做的操作 [0-11]: ' command; then
+      printf '\n'
+      exit 0
+    fi
+    case "$command" in
+      1) command_add no; pause_menu ;;
+      2) command_port; pause_menu ;;
+      3) command_show all; pause_menu ;;
+      4) command_edit; pause_menu ;;
+      5) command_toggle_enabled; pause_menu ;;
+      6) command_remove; pause_menu ;;
+      7) command_reset; pause_menu ;;
+      8) command_status; pause_menu ;;
+      9) command_logs; pause_menu ;;
+      10) command_update; pause_menu ;;
+      11)
+        command_uninstall
+        if installation_complete; then pause_menu; else exit 0; fi
+        ;;
+      0) exit 0 ;;
+      *) warn "无效选项。" ;;
+    esac
+  done
+}
+
 main() {
   local command="${1:-}"
   case "$command" in
+    --menu-after-update)
+      require_root
+      [[ $# -eq 2 && "${2:-}" == "$SCRIPT_VERSION" ]] \
+        || die "更新菜单交接版本不匹配，请重新输入 puppyip。"
+      running_as_installed_manager && installation_complete \
+        || die "更新菜单交接的安装不完整，请检查安装后重试。"
+      if installation_upgrade_needed; then
+        die "更新菜单交接未通过版本核对，请检查安装后重试。"
+      fi
+      show_brand_banner
+      run_management_menu
+      ;;
     install) command_install ;;
     add) command_add ;;
     port) shift; command_port "$@" ;;
@@ -3736,31 +3773,7 @@ main() {
       show_brand_banner
       require_root
       maybe_update_manager
-      while true; do
-        show_menu
-        if ! read -r -p '请选择要做的操作 [0-11]: ' command; then
-          printf '\n'
-          exit 0
-        fi
-        case "$command" in
-          1) command_add no; pause_menu ;;
-          2) command_port; pause_menu ;;
-          3) command_show all; pause_menu ;;
-          4) command_edit; pause_menu ;;
-          5) command_toggle_enabled; pause_menu ;;
-          6) command_remove; pause_menu ;;
-          7) command_reset; pause_menu ;;
-          8) command_status; pause_menu ;;
-          9) command_logs; pause_menu ;;
-          10) command_update; pause_menu ;;
-          11)
-            command_uninstall
-            if installation_complete; then pause_menu; else exit 0; fi
-            ;;
-          0) exit 0 ;;
-          *) warn "无效选项。" ;;
-        esac
-      done
+      run_management_menu
       ;;
     *) usage; die "未知命令：$command" ;;
   esac

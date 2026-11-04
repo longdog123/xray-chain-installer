@@ -1,0 +1,64 @@
+{
+  "schema": 1,
+  "kind": "isolated_regression_tests",
+  "installer_version": "0.2.21",
+  "started_at": "2026-11-04T02:58:02.457424+00:00",
+  "source_sha256": "5f2717279f5d7bbae6210da274f9deb6a36aae60621fa4569470e51af385a6db",
+  "runtime_version": "Xray 26.3.27 (Xray, Penetrates Everything.) d2758a0 (go1.26.1 linux/amd64)",
+  "runtime_sha256": "8255dd939c34cf966cc91517b6324dd3c8d0bcf49ffac8beca049a38c46845ed",
+  "runtime_reused_from": "2026-11-04-address-refresh-regressions.json",
+  "results": [
+    {
+      "suite": "tests/integration.sh",
+      "started_at": "2026-11-04T02:58:02.458070+00:00",
+      "completed_at": "2026-11-04T02:58:06.085391+00:00",
+      "elapsed_seconds": 3.627,
+      "exit_code": 0,
+      "test_sha256": "e37d0a889883396ba788a81546f8287763f94e2c47daa02dd13159e0d5c24dd6"
+    },
+    {
+      "suite": "tests/add-preview.sh",
+      "started_at": "2026-11-04T02:58:06.085658+00:00",
+      "completed_at": "2026-11-04T02:58:17.880572+00:00",
+      "elapsed_seconds": 11.795,
+      "exit_code": 0,
+      "test_sha256": "cca05ee73c0be03438ff997448be690aa790ee43c0e9cd9db811cc784919f08f"
+    },
+    {
+      "suite": "tests/port-change.sh",
+      "started_at": "2026-11-04T02:58:17.880827+00:00",
+      "completed_at": "2026-11-04T02:58:17.947430+00:00",
+      "elapsed_seconds": 0.067,
+      "exit_code": 0,
+      "test_sha256": "3aabe799e1d7c8239aaac4be1a3d05027a80d87036a41adafb2f026ba4fa0ca9"
+    },
+    {
+      "suite": "tests/rollback.sh",
+      "started_at": "2026-11-04T02:58:17.947609+00:00",
+      "completed_at": "2026-11-04T02:58:18.579594+00:00",
+      "elapsed_seconds": 0.632,
+      "exit_code": 0,
+      "test_sha256": "a76d3dd8508f2b97ea4b22994e88de758de80c7a07a1a03351a2b5f4fde6c5e0"
+    },
+    {
+      "suite": "tests/address-refresh.sh",
+      "started_at": "2026-11-04T02:58:18.579786+00:00",
+      "completed_at": "2026-11-04T02:58:40.270092+00:00",
+      "elapsed_seconds": 22.883,
+      "exit_code": 0,
+      "test_sha256": "48056c680c705b98cd37af3544da2fb91e6a6bb615b83c59099096a6dbf641ae"
+    }
+  ],
+  "completed_at": "2026-11-04T02:58:40.270689+00:00",
+  "passed": true,
+  "cleanup": {
+    "new_fixture_directory_count": 0,
+    "snapshot_and_verified_runtime_retained": true
+  },
+  "exclusions": [
+    "No production deployment or customer data",
+    "No real provider IP replacement",
+    "No external client reachability test",
+    "Auto-update and static checks recorded separately"
+  ]
+}

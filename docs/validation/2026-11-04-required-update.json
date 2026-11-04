@@ -1,0 +1,281 @@
+{
+  "schema_version": 1,
+  "runs": [
+    {
+      "phase": "red",
+      "started_at": "2026-11-04T02:54:39.041411+00:00",
+      "completed_at": "2026-11-04T02:54:39.373524+00:00",
+      "source_version": "0.2.20",
+      "source_sha256": "9d624a993081af23dcf315cd8c745b178ab9b64727cccd06c6af7fdf01f58de2",
+      "test_sha256": "e1844585e966e6787666c9232d36bc88bcb8f8ccf3e4534285e515ab5107998d",
+      "command": "bash tests/auto-update.sh api-failure disabled",
+      "exit_code": 1,
+      "total": 2,
+      "passed": 0,
+      "failed": 2,
+      "expected_failures": [
+        "Update-check failure returned success and opened the old menu.",
+        "The obsolete disable environment variable skipped the required check."
+      ],
+      "result": "expected_failure"
+    },
+    {
+      "phase": "implementation-verification",
+      "started_at": "2026-11-04T02:57:39.785919+00:00",
+      "completed_at": "2026-11-04T02:57:43.380743+00:00",
+      "source_version": "0.2.21",
+      "source_sha256": "5f2717279f5d7bbae6210da274f9deb6a36aae60621fa4569470e51af385a6db",
+      "test_sha256": "23cdbaf20a4ad10761c03dc1a7a02aeb6efe49b49e7669c95bb3420fa679d6d2",
+      "command": "bash -n tests/auto-update.sh; bash tests/auto-update.sh",
+      "exit_code": 0,
+      "passed": 35,
+      "failed": 0,
+      "result": "passed",
+      "total": 35,
+      "cases": [
+        {
+          "name": "new",
+          "result": "passed"
+        },
+        {
+          "name": "same",
+          "result": "passed"
+        },
+        {
+          "name": "older",
+          "result": "passed"
+        },
+        {
+          "name": "api-failure",
+          "result": "passed"
+        },
+        {
+          "name": "malformed-json",
+          "result": "passed"
+        },
+        {
+          "name": "invalid-sha",
+          "result": "passed"
+        },
+        {
+          "name": "download-failure",
+          "result": "passed"
+        },
+        {
+          "name": "invalid-version",
+          "result": "passed"
+        },
+        {
+          "name": "duplicate-version",
+          "result": "passed"
+        },
+        {
+          "name": "missing-marker",
+          "result": "passed"
+        },
+        {
+          "name": "bad-syntax",
+          "result": "passed"
+        },
+        {
+          "name": "oversized",
+          "result": "passed"
+        },
+        {
+          "name": "upgrade-failure",
+          "result": "passed"
+        },
+        {
+          "name": "manager-mismatch",
+          "result": "passed"
+        },
+        {
+          "name": "state-mismatch",
+          "result": "passed"
+        },
+        {
+          "name": "post-update-failure",
+          "result": "passed"
+        },
+        {
+          "name": "menu-exit",
+          "result": "passed"
+        },
+        {
+          "name": "temp-failure",
+          "result": "passed"
+        },
+        {
+          "name": "disabled",
+          "result": "passed"
+        },
+        {
+          "name": "add",
+          "result": "passed"
+        },
+        {
+          "name": "status",
+          "result": "passed"
+        },
+        {
+          "name": "same-state",
+          "result": "passed"
+        },
+        {
+          "name": "same-legacy",
+          "result": "passed"
+        },
+        {
+          "name": "same-schema",
+          "result": "passed"
+        },
+        {
+          "name": "same-repair-failure",
+          "result": "passed"
+        },
+        {
+          "name": "handoff-valid",
+          "result": "passed"
+        },
+        {
+          "name": "handoff-legacy-path",
+          "result": "passed"
+        },
+        {
+          "name": "handoff-missing",
+          "result": "passed"
+        },
+        {
+          "name": "handoff-wrong",
+          "result": "passed"
+        },
+        {
+          "name": "handoff-extra",
+          "result": "passed"
+        },
+        {
+          "name": "handoff-uninstalled",
+          "result": "passed"
+        },
+        {
+          "name": "handoff-incomplete",
+          "result": "passed"
+        },
+        {
+          "name": "handoff-state",
+          "result": "passed"
+        },
+        {
+          "name": "handoff-legacy",
+          "result": "passed"
+        },
+        {
+          "name": "handoff-schema",
+          "result": "passed"
+        }
+      ]
+    },
+    {
+      "phase": "remote-entry-green",
+      "started_at": "2026-11-04T02:58:18Z",
+      "completed_at": "2026-11-04T02:58:20Z",
+      "timestamp_precision": "second",
+      "source_version": "0.2.21",
+      "source_sha256": "5f2717279f5d7bbae6210da274f9deb6a36aae60621fa4569470e51af385a6db",
+      "test_sha256": "ed554a5f0ce7ed4298fcc5568d1c8883bc47d45ca268ff549e908a55e8b72857",
+      "command": "bash -n tests/static.sh && bash tests/static.sh",
+      "result": "passed",
+      "exit_code": 0,
+      "scoped_case_count": 4,
+      "scoped_cases": [
+        "old-with-no",
+        "old-with-eof",
+        "upgrade-failure",
+        "current-version"
+      ],
+      "note": "The complete static suite passed; these are the four changed behavioral cases."
+    },
+    {
+      "phase": "remote-entry-red-reverification",
+      "executed_at": "2026-11-04T02:58:58Z",
+      "timestamp_precision": "second",
+      "source_version": "0.2.20",
+      "source_sha256": "9d624a993081af23dcf315cd8c745b178ab9b64727cccd06c6af7fdf01f58de2",
+      "test_sha256": "ed554a5f0ce7ed4298fcc5568d1c8883bc47d45ca268ff549e908a55e8b72857",
+      "command": "bash -n tests/static.sh && bash tests/static.sh",
+      "result": "expected_failure",
+      "exit_code": 1,
+      "scoped_case_count": 4,
+      "passed": 1,
+      "failed": 3,
+      "failure_reason": "The previous implementation prompted before all old-installation upgrade scenarios; n could cancel.",
+      "note": "After the green run, the final test fixture was rechecked against the unchanged baseline to confirm that it still catches the original behavior."
+    },
+    {
+      "phase": "remote-entry-final-green",
+      "started_at": "2026-11-04T03:01:48Z",
+      "completed_at": "2026-11-04T03:01:52Z",
+      "timestamp_precision": "second",
+      "source_version": "0.2.21",
+      "source_sha256": "5f2717279f5d7bbae6210da274f9deb6a36aae60621fa4569470e51af385a6db",
+      "test_sha256": "89dde80ae676e9088f24086d883b1e1e02aa9b989b54fb07767c73095cf6935f",
+      "command": "bash -n tests/static.sh && bash tests/static.sh",
+      "result": "passed",
+      "exit_code": 0,
+      "scoped_case_count": 6,
+      "scoped_cases": [
+        "old-with-no",
+        "old-with-eof",
+        "upgrade-failure",
+        "upgrade-errexit",
+        "incomplete-upgrade",
+        "current-version"
+      ],
+      "reason": "Added failure-boundary protection: bare false inside the upgrade must stop before subsequent side effects; a nominally successful upgrade with old versions must stop before adding a node. Only static tests were rerun because production and automatic-update tests were unchanged."
+    }
+  ],
+  "kind": "isolated-required-update-regression-evidence",
+  "recorded_at": "2026-11-04T03:02:23.490562+00:00",
+  "scope": "Required management-script update before entering the installed menu or continuing an existing remote installation.",
+  "environment": {
+    "platform": "WSL Linux",
+    "runtime": [
+      "Bash",
+      "jq",
+      "Python 3"
+    ],
+    "network": "stubbed",
+    "service_operations": "stubbed and forbidden",
+    "shellcheck": "not installed"
+  },
+  "verified_properties": [
+    "The obsolete XRAY_CHAIN_AUTO_UPDATE=0 setting cannot bypass update checks.",
+    "Download, validation, temporary-directory, upgrade and post-upgrade consistency failures exit nonzero without opening any menu.",
+    "An upgrade that committed files but returned nonzero still stops instead of entering either old or new menu.",
+    "Complete same/older releases skip unnecessary upgrade; inconsistent same-version installations are repaired and verified first.",
+    "Successful upgrades enter the installed script once using the version-qualified internal handoff, preserving its exit status.",
+    "Real installed-path and installation-file checks reject wrong paths, incomplete installations, invalid arguments and inconsistent state/manager/schema versions.",
+    "Explicit add/status commands do not enter the menu-update flow.",
+    "The remote installer upgrades existing old installations without a prompt even when input is n or EOF; failed upgrades cannot add a node.",
+    "All download candidates and per-run temporary directories checked by the automatic-update harness were cleaned.",
+    "The remote-entry test covers an unhandled bare false inside the upgrader and a zero exit with unchanged installed versions; neither can continue to adding a node."
+  ],
+  "cleanup": {
+    "per_case_fixtures": "removed by TemporaryDirectory or the sourced cleanup trap",
+    "production_changes": "none from tests",
+    "isolated_harness_snapshots": "retained temporarily for inspection"
+  },
+  "exclusions": [
+    "No real GitHub download, network outage, systemd operation, server installation or customer configuration was exercised.",
+    "Candidate upgrade subprocesses use synthetic installed files; compatibility and real Xray configuration validation belong to the separate integration suite.",
+    "This evidence does not establish customer network reachability, live deployment status or zero-interruption behavior.",
+    "Reports contain no credentials, complete share links, raw logs, customer data or personal absolute paths."
+  ],
+  "owner_actions": {
+    "required_for_these_isolated_checks": []
+  },
+  "publication": {
+    "report_saved_locally": true,
+    "github_upload": "not performed by this test task"
+  }
+}

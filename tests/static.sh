@@ -303,31 +303,72 @@ bash -c '
     require_systemd() { :; }
     show_brand_banner() { :; }
     info() { printf '%s\n' "$*"; }
-    UPGRADE_CALLED="no"
-    ADD_CALLED="no"
-    command_upgrade() { UPGRADE_CALLED="yes"; }
-    command_add() { ADD_CALLED="yes"; }
+    # Event files retain ordering across subshells and failed operations.
+    remote_calls="$upgrade_fixture_dir/calls"
+    eval "$(declare -f prompt_yes_no | sed "1s/prompt_yes_no/original_prompt_yes_no/")"
+    prompt_yes_no() {
+      printf "%s\n" prompt >>"$remote_calls"
+      original_prompt_yes_no "$@"
+    }
+    command_upgrade() {
+      printf "%s\n" upgrade >>"$remote_calls"
+      [[ "$upgrade_status" == 0 ]] || return "$upgrade_status"
+      case "$case_name" in
+        upgrade-errexit)
+          false
+          printf "%s\n" should-not-reach >>"$remote_calls"
+          ;;
+        incomplete-upgrade) return 0 ;;
+      esac
+      jq --arg version "$SCRIPT_VERSION" \
+        ".schema = 2 | .installerVersion = \$version" "$STATE_FILE" >"${STATE_FILE}.new"
+      mv -f -- "${STATE_FILE}.new" "$STATE_FILE"
+      printf "%s\n" "SCRIPT_VERSION=\"${SCRIPT_VERSION}\"" >"$MANAGER_BIN"
+      printf "%s\n" "SCRIPT_VERSION=\"${SCRIPT_VERSION}\"" >"$LEGACY_MANAGER_BIN"
+    }
+    command_add() { printf "%s\n" add >>"$remote_calls"; }
+    remote_failures=0
+    check_remote_run() {
+      local case_name="$1" input_file="$2" upgrade_status="$3" expected_calls="$4"
+      local expected_status="${5:-$upgrade_status}" remote_status actual_calls
+      if [[ "$case_name" != "current-version" ]]; then
+        printf "%s\n" \
+          "{\"schema\":1,\"installerVersion\":\"0.2.15\"}" >"$STATE_FILE"
+        printf "%s\n" "SCRIPT_VERSION=\"0.2.15\"" >"$MANAGER_BIN"
+        printf "%s\n" "SCRIPT_VERSION=\"0.2.15\"" >"$LEGACY_MANAGER_BIN"
+      fi
+      : >"$remote_calls"
+      set +e
+      (set -e; handle_existing_remote_run <"$input_file") \
+        >"$upgrade_fixture_dir/$case_name.out" 2>&1
+      remote_status=$?
+      set -e
+      actual_calls="$(paste -sd , "$remote_calls")"
+      if [[ "$actual_calls" != "$expected_calls" ]] \
+        || [[ "$expected_status" == 0 && "$remote_status" != 0 ]] \
+        || [[ "$expected_status" != 0 && "$remote_status" == 0 ]]; then
+        printf "Remote entry %s failed: expected calls %s; got %s, status %s\n" \
+          "$case_name" "$expected_calls" "$actual_calls" "$remote_status" >&2
+        ((remote_failures += 1))
+      fi
+    }
 
-    cancel_output="$(handle_existing_remote_run <<<"n")"
-    [[ "$UPGRADE_CALLED" == "no" ]]
-    [[ "$ADD_CALLED" == "no" ]]
-    [[ "$cancel_output" == *"管理菜单：输入 puppyip"* ]]
-
-    handle_existing_remote_run <<<"y"
-    [[ "$UPGRADE_CALLED" == "yes" ]]
-    [[ "$ADD_CALLED" == "yes" ]]
+    printf "%s\n" n >"$upgrade_fixture_dir/no-input"
+    printf "%s\n" y >"$upgrade_fixture_dir/yes-input"
+    check_remote_run old-with-no "$upgrade_fixture_dir/no-input" 0 "upgrade,add"
+    check_remote_run old-with-eof /dev/null 0 "upgrade,add"
+    check_remote_run upgrade-failure "$upgrade_fixture_dir/yes-input" 42 "upgrade"
+    check_remote_run upgrade-errexit /dev/null 0 "upgrade" 1
+    check_remote_run incomplete-upgrade /dev/null 0 "upgrade" 1
 
     jq --arg version "$SCRIPT_VERSION" \
       ".schema = 2 | .installerVersion = \$version" "$STATE_FILE" >"${STATE_FILE}.new"
     mv -f -- "${STATE_FILE}.new" "$STATE_FILE"
     printf "%s\n" "SCRIPT_VERSION=\"${SCRIPT_VERSION}\"" >"$MANAGER_BIN"
     printf "%s\n" "SCRIPT_VERSION=\"${SCRIPT_VERSION}\"" >"$LEGACY_MANAGER_BIN"
-    UPGRADE_CALLED="no"
-    ADD_CALLED="no"
-    handle_existing_remote_run </dev/null
-    [[ "$UPGRADE_CALLED" == "no" ]]
-    [[ "$ADD_CALLED" == "yes" ]]
+    check_remote_run current-version /dev/null 0 "add"
     ! installation_upgrade_needed
+    [[ "$remote_failures" == 0 ]]
 
     printf "%s\n" "SCRIPT_VERSION=\"9.0.0\"" >"$MANAGER_BIN"
     set +e

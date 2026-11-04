@@ -10,7 +10,6 @@ run_worker() {
   local scenario="$1" case_dir="$2"
   # shellcheck source=../install.sh
   source "${ROOT_DIR}/install.sh"
-  export XRAY_CHAIN_AUTO_UPDATE=0
   # Keep observable service boundaries even when production redirects systemctl.
   exec 3>&1
   export PREVIEW_SCENARIO="$scenario"
@@ -256,6 +255,8 @@ STATE
         port-menu)
           installation_complete() { return 0; }
           running_as_installed_manager() { return 0; }
+          # Update policy has its own suite; keep this test on the port menu flow.
+          maybe_update_manager() { :; }
           show_brand_banner() { :; }
           (main)
           ;;

@@ -16,6 +16,18 @@ run_worker() {
   LEGACY_MANAGER_BIN="${case_dir}/installed/xray-chain"
   STATE_FILE="${case_dir}/installed/state.json"
   mkdir -p "${case_dir}/installed"
+  CONFIG_FILE="${case_dir}/installed/config.json"
+  XRAY_BIN="${case_dir}/installed/xray"
+  ASSET_DIR="${case_dir}/installed/assets"
+  SERVICE_FILE="${case_dir}/installed/xray-chain.service"
+  SCRIPT_SOURCE="$MANAGER_BIN"
+  mkdir -p "$ASSET_DIR"
+  printf '{}\n' >"$CONFIG_FILE"
+  printf '#!/usr/bin/env bash\nexit 99\n' >"$XRAY_BIN"
+  chmod 0755 "$XRAY_BIN"
+  : >"${ASSET_DIR}/geoip.dat"
+  : >"${ASSET_DIR}/geosite.dat"
+  : >"$SERVICE_FILE"
   printf '#!/usr/bin/env bash\n# XRAY_CHAIN_SCRIPT\nSCRIPT_VERSION="%s"\n' "$SCRIPT_VERSION" >"$MANAGER_BIN"
   cp -- "$MANAGER_BIN" "$LEGACY_MANAGER_BIN"
   cp -- "$MANAGER_BIN" "${case_dir}/old-manager"
@@ -24,14 +36,35 @@ run_worker() {
   printf '%s' "$SCRIPT_VERSION" >"${case_dir}/old-version"
   candidate_version='99.10.2'
   case "$scenario" in
-    same) candidate_version="$SCRIPT_VERSION" ;;
+    same|same-state|same-legacy|same-schema|same-repair-failure) candidate_version="$SCRIPT_VERSION" ;;
     older) candidate_version='0.0.1' ;;
     invalid-version) candidate_version='not-a-version' ;;
   esac
+  case "$scenario" in
+    same-state|same-repair-failure|handoff-state)
+      jq '.installerVersion = "0.0.1"' "$STATE_FILE" >"${STATE_FILE}.new"
+      mv -- "${STATE_FILE}.new" "$STATE_FILE"
+      ;;
+    same-legacy|handoff-legacy)
+      printf '%s\n' 'SCRIPT_VERSION="0.0.1"' >"$LEGACY_MANAGER_BIN"
+      ;;
+    same-schema|handoff-schema)
+      jq '.schema = 1' "$STATE_FILE" >"${STATE_FILE}.new"
+      mv -- "${STATE_FILE}.new" "$STATE_FILE"
+      ;;
+  esac
+  cp -- "$STATE_FILE" "${case_dir}/old-state.json"
+  cp -- "$LEGACY_MANAGER_BIN" "${case_dir}/old-legacy-manager"
+  case "$scenario" in
+    handoff-uninstalled)
+      SCRIPT_SOURCE="${case_dir}/other-entry.sh"
+      cp -- "$MANAGER_BIN" "$SCRIPT_SOURCE"
+      ;;
+    handoff-incomplete) rm -- "$CONFIG_FILE" ;;
+    handoff-legacy-path) SCRIPT_SOURCE="$LEGACY_MANAGER_BIN" ;;
+  esac
 
   require_root() { printf '__ROOT__\n'; }
-  installation_complete() { return 0; }
-  running_as_installed_manager() { return 0; }
   show_brand_banner() { printf '__BANNER__\n'; }
   show_menu() {
     if [[ "$AUTO_REEXEC_MENU" == 'yes' ]]; then
@@ -82,8 +115,12 @@ run_worker() {
   {
     printf '%s\n' 'MANAGER_BIN="${AUTO_CASE_DIR}/installed/puppyip"' \
       'LEGACY_MANAGER_BIN="${AUTO_CASE_DIR}/installed/xray-chain"' \
-      'STATE_FILE="${AUTO_CASE_DIR}/installed/state.json"'
-    declare -f require_root installation_complete running_as_installed_manager show_brand_banner \
+      'STATE_FILE="${AUTO_CASE_DIR}/installed/state.json"' \
+      'CONFIG_FILE="${AUTO_CASE_DIR}/installed/config.json"' \
+      'XRAY_BIN="${AUTO_CASE_DIR}/installed/xray"' \
+      'ASSET_DIR="${AUTO_CASE_DIR}/installed/assets"' \
+      'SERVICE_FILE="${AUTO_CASE_DIR}/installed/xray-chain.service"'
+    declare -f require_root show_brand_banner \
       show_menu command_add command_status systemctl new_temp_dir curl
   } >"${case_dir}/boundaries.sh"
   {
@@ -93,7 +130,7 @@ set -Eeuo pipefail
 if [[ "${1:-}" == 'upgrade' ]]; then
   printf '__UPGRADE__\n'
   printf '%s\n' "$0" >"${AUTO_CASE_DIR}/executed-candidate"
-  if [[ "$AUTO_SCENARIO" == 'upgrade-failure' ]]; then
+  if [[ "$AUTO_SCENARIO" == 'upgrade-failure' || "$AUTO_SCENARIO" == 'same-repair-failure' ]]; then
     false
     printf '__ERREXIT_IGNORED__\n'
   fi
@@ -102,7 +139,7 @@ if [[ "${1:-}" == 'upgrade' ]]; then
     cp -- "$0" "${AUTO_CASE_DIR}/installed/xray-chain"
   fi
   if [[ "$AUTO_SCENARIO" != 'state-mismatch' ]]; then
-    jq --arg version "$SCRIPT_VERSION" '.installerVersion = $version' \
+    jq --arg version "$SCRIPT_VERSION" '.schema = 2 | .installerVersion = $version' \
       "${AUTO_CASE_DIR}/installed/state.json" >"${AUTO_CASE_DIR}/installed/state.new"
     mv -- "${AUTO_CASE_DIR}/installed/state.new" "${AUTO_CASE_DIR}/installed/state.json"
   fi
@@ -111,18 +148,23 @@ if [[ "${1:-}" == 'upgrade' ]]; then
   fi
   exit 0
 fi
-printf '__REEXEC_ENV__:%s\n' "${XRAY_CHAIN_AUTO_UPDATE:-unset}"
+printf '__HANDOFF__:%s:%s\n' "${1:-}" "${2:-}"
 candidate_version="$SCRIPT_VERSION"
 # shellcheck disable=SC1090
 source "$AUTO_SOURCE"
 # shellcheck disable=SC1090
 source "${AUTO_CASE_DIR}/boundaries.sh"
 printf -v SCRIPT_VERSION '%s' "$candidate_version"
+SCRIPT_SOURCE="$0"
 export AUTO_REEXEC_MENU='yes'
-main
+main "$@"
 CANDIDATE
   } >"${case_dir}/candidate.sh"
   case "$scenario" in
+    handoff-missing) main --menu-after-update ;;
+    handoff-wrong) main --menu-after-update 0.0.1 ;;
+    handoff-extra) main --menu-after-update "$SCRIPT_VERSION" unexpected ;;
+    handoff-*) main --menu-after-update "$SCRIPT_VERSION" ;;
     duplicate-version) printf 'SCRIPT_VERSION="99.10.3"\n' >>"${case_dir}/candidate.sh" ;;
     missing-marker) sed -i '/^# XRAY_CHAIN_SCRIPT$/d' "${case_dir}/candidate.sh" ;;
     bad-syntax) printf 'if then\n' >>"${case_dir}/candidate.sh" ;;
@@ -152,7 +194,7 @@ for dependency in jq python3; do
   }
 done
 
-python3 - "${BASH_SOURCE[0]}" <<'PY'
+python3 - "${BASH_SOURCE[0]}" "$@" <<'PY'
 import errno
 import json
 import os
@@ -170,7 +212,18 @@ script = str(Path(sys.argv[1]).resolve())
 cases = ["new", "same", "older", "api-failure", "malformed-json", "invalid-sha",
          "download-failure", "invalid-version", "duplicate-version", "missing-marker",
          "bad-syntax", "oversized", "upgrade-failure", "manager-mismatch",
-         "state-mismatch", "post-update-failure", "menu-exit", "temp-failure", "disabled", "add", "status"]
+         "state-mismatch", "post-update-failure", "menu-exit", "temp-failure", "disabled", "add", "status",
+         "same-state", "same-legacy", "same-schema", "same-repair-failure",
+         "handoff-valid", "handoff-legacy-path", "handoff-missing", "handoff-wrong", "handoff-extra", "handoff-uninstalled", "handoff-incomplete",
+         "handoff-state", "handoff-legacy", "handoff-schema"]
+if len(sys.argv) > 2:
+    cases = [scenario for scenario in cases if scenario in sys.argv[2:]]
+failure_cases = {"api-failure", "malformed-json", "invalid-sha", "download-failure",
+                 "invalid-version", "duplicate-version", "missing-marker", "bad-syntax", "oversized",
+                 "upgrade-failure", "manager-mismatch", "state-mismatch", "post-update-failure", "temp-failure",
+                 "same-repair-failure", "handoff-missing", "handoff-wrong", "handoff-extra", "handoff-uninstalled", "handoff-incomplete",
+                 "handoff-state", "handoff-legacy", "handoff-schema"}
+repair_cases = {"same-state", "same-legacy", "same-schema"}
 
 
 def require(condition, message):
@@ -224,11 +277,11 @@ with tempfile.TemporaryDirectory(prefix="xray-chain-auto-update.") as directory:
         case_dir.mkdir()
         try:
             status, output = capture(scenario, case_dir)
-            require(status == (7 if scenario == "menu-exit" else 0),
+            require(status != 0 if scenario in failure_cases else status == (7 if scenario == "menu-exit" else 0),
                     f"unexpected exit status {status}: {output}")
             calls_file = case_dir / "curl-calls.jsonl"
             calls = [json.loads(line) for line in calls_file.read_text().splitlines()] if calls_file.exists() else []
-            expected_calls = 0 if scenario in {"disabled", "add", "status", "temp-failure"} else (
+            expected_calls = 0 if scenario in {"add", "status", "temp-failure"} or scenario.startswith("handoff-") else (
                 1 if scenario in {"api-failure", "malformed-json", "invalid-sha"} else 2)
             require(len(calls) == expected_calls,
                     f"expected {expected_calls} download calls, observed {len(calls)}")
@@ -243,41 +296,44 @@ with tempfile.TemporaryDirectory(prefix="xray-chain-auto-update.") as directory:
                 require(calls[0][-1].endswith("/git/ref/heads/main"), "version check did not resolve main")
                 require(calls[1][-1].endswith("/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/install.sh"),
                         "candidate was not pinned to the resolved commit")
-            if scenario in {"new", "post-update-failure", "menu-exit"}:
+            if scenario in {"new", "disabled", "menu-exit"} | repair_cases:
                 require(output.count("__UPGRADE__") == 1 and output.count("__NEW_MENU__") == 1,
                         "new version did not upgrade and enter its menu exactly once")
                 require("__OLD_MENU__" not in output, "old menu was shown after successful handoff")
-                require("__REEXEC_ENV__:0" in output, "new menu did not receive the no-repeat-check setting")
+                expected_version = (case_dir / "old-version").read_text() if scenario in repair_cases else "99.10.2"
+                require(f"__HANDOFF__:--menu-after-update:{expected_version}" in output,
+                        "installed menu did not receive the verified version handoff")
                 require("重启" in output[:output.index("__UPGRADE__")], "automatic restart was not explained before upgrade")
                 state = json.loads((case_dir / "installed/state.json").read_text())
                 old_state = json.loads((case_dir / "old-state.json").read_text())
-                require(state == dict(old_state, installerVersion="99.10.2"), "upgrade changed preserved state")
+                require(state == dict(old_state, schema=2, installerVersion=expected_version), "upgrade changed preserved state")
                 require((case_dir / "installed/puppyip").read_bytes() == (case_dir / "installed/xray-chain").read_bytes(),
                         "successful update left different management commands")
-                if scenario == "post-update-failure":
-                    after_upgrade = output.split("__UPGRADE__", 1)[1]
-                    require("[!]" in after_upgrade and "收尾" in after_upgrade,
-                            "committed update did not explain its finishing failure")
             elif scenario in {"add", "status"}:
                 require(f"__{scenario.upper()}__" in output, "explicit command did not run")
                 require("__OLD_MENU__" not in output and "__UPGRADE__" not in output, "explicit command entered automatic update")
+            elif scenario in failure_cases:
+                require("__OLD_MENU__" not in output and "__NEW_MENU__" not in output,
+                        "failed required update or invalid handoff opened a menu")
+                require("__HANDOFF__" not in output, "failed required update executed the installed menu")
+                attempted = scenario in {"upgrade-failure", "same-repair-failure", "manager-mismatch", "state-mismatch", "post-update-failure"}
+                require(output.count("__UPGRADE__") == int(attempted), "unexpected candidate execution")
+                require("[x]" in output or "[!]" in output, "required update failure did not explain why it stopped")
             else:
                 require(output.count("__OLD_MENU__") == 1 and "__NEW_MENU__" not in output,
-                        "skipped or failed update did not continue the old menu")
-                require("__REEXEC_ENV__" not in output, "failed/unnecessary update executed the candidate menu")
+                        "complete current installation did not enter the menu")
+                require("__HANDOFF__" not in output, "unnecessary update executed the candidate menu")
                 if scenario in {"same", "older"}:
                     require("无需更新" in output and "[!]" not in output,
                             "an equal/older valid candidate was treated as a failed download")
-                attempted = scenario in {"upgrade-failure", "manager-mismatch", "state-mismatch"}
-                require(output.count("__UPGRADE__") == int(attempted), "unexpected candidate execution")
-                if scenario not in {"same", "older", "disabled"}:
-                    require("[!]" in output, "update failure did not warn before continuing")
-                if not attempted or scenario == "upgrade-failure":
-                    require((case_dir / "installed/state.json").read_bytes() == (case_dir / "old-state.json").read_bytes(),
-                            "skipped or failed upgrade changed installed state")
-                    for filename in ("puppyip", "xray-chain"):
-                        require((case_dir / f"installed/{filename}").read_bytes() == (case_dir / "old-manager").read_bytes(),
-                                "skipped or failed upgrade changed a management command")
+                require("__UPGRADE__" not in output, "complete installation was unnecessarily upgraded")
+            writes_expected = scenario in {"new", "disabled", "menu-exit", "manager-mismatch", "state-mismatch", "post-update-failure"} | repair_cases
+            if not writes_expected:
+                require((case_dir / "installed/state.json").read_bytes() == (case_dir / "old-state.json").read_bytes(),
+                        "skipped or failed upgrade changed installed state")
+                for filename, original in (("puppyip", "old-manager"), ("xray-chain", "old-legacy-manager")):
+                    require((case_dir / f"installed/{filename}").read_bytes() == (case_dir / original).read_bytes(),
+                            "skipped or failed upgrade changed a management command")
             require("__ERREXIT_IGNORED__" not in output, "conditional execution swallowed the upgrade's set -e")
             if expected_calls:
                 require("__ROOT__" in output, "automatic update was entered without the root check")
