@@ -9,6 +9,7 @@ bash -n "${ROOT_DIR}/tests/integration.sh"
 bash -n "${ROOT_DIR}/tests/add-preview.sh"
 bash -n "${ROOT_DIR}/tests/port-change.sh"
 bash -n "${ROOT_DIR}/tests/auto-update.sh"
+bash -n "${ROOT_DIR}/tests/address-refresh.sh"
 [[ ! -f "${ROOT_DIR}/tests/preflight.sh" ]] || bash -n "${ROOT_DIR}/tests/preflight.sh"
 
 bash -c '

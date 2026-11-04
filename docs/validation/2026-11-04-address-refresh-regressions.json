@@ -1,0 +1,139 @@
+{
+  "schema": 1,
+  "type": "isolated_regression_tests",
+  "started_at_utc": "2026-11-04T02:31:41.392992+00:00",
+  "reason": "Display-address resolution behavior changed since the archived 0.2.19 reproduction; preserve existing node and upgrade compatibility.",
+  "prior_evidence": "2026-11-04 ip-change reproduction, source bb261c940c130851334dfd77621370474c2eab05; 91 stale links across four changed-IP fixtures",
+  "source_base_commit": "bb261c940c130851334dfd77621370474c2eab05",
+  "source_snapshot_has_uncommitted_changes": true,
+  "installer_version": "0.2.20",
+  "source_sha256": "9d624a993081af23dcf315cd8c745b178ab9b64727cccd06c6af7fdf01f58de2",
+  "environment": {
+    "os": "Ubuntu 24.04 LTS on isolated WSL",
+    "architecture": "x86_64"
+  },
+  "runtime": {
+    "version": "Xray 26.3.27 (Xray, Penetrates Everything.) d2758a0 (go1.26.1 linux/amd64)",
+    "official_release": "https://github.com/XTLS/Xray-core/releases/tag/v26.3.27",
+    "archive_sha256": "23cd9af937744d97776ee35ecad4972cf4b2109d1e0fe6be9930467608f7c8ae",
+    "official_dgst_sha256_matched": true,
+    "files_sha256": {
+      "xray": "8255dd939c34cf966cc91517b6324dd3c8d0bcf49ffac8beca049a38c46845ed",
+      "geoip.dat": "744c97b74c52bae2ac8664fef6ac481d7765cb8432a0df54f0368a88b9b4a354",
+      "geosite.dat": "adf92de0cfc70e458b399f04c5f912bf42d115ed7e37281b30e2f1c68605e4e9"
+    },
+    "official_dgst_asset_sha256": "052fc1c5c4bd5b44d799f785792a9631bce8da4aa0d385a783e9a711ad352a58",
+    "official_dgst_asset_api_digest_matched": true
+  },
+  "results": [
+    {
+      "suite": "tests/integration.sh",
+      "started_at_utc": "2026-11-04T02:31:41.548836+00:00",
+      "finished_at_utc": "2026-11-04T02:31:44.935926+00:00",
+      "duration_seconds": 3.387,
+      "exit_code": 0,
+      "status": "passed",
+      "timed_out": false,
+      "test_sha256": "e37d0a889883396ba788a81546f8287763f94e2c47daa02dd13159e0d5c24dd6",
+      "output_bytes": 3683,
+      "source_sha256_unchanged": true
+    },
+    {
+      "suite": "tests/add-preview.sh",
+      "started_at_utc": "2026-11-04T02:31:44.936737+00:00",
+      "finished_at_utc": "2026-11-04T02:31:54.973264+00:00",
+      "duration_seconds": 10.037,
+      "exit_code": 0,
+      "status": "passed",
+      "timed_out": false,
+      "test_sha256": "eb55e30377fe294060df2e03944ae71985e6ea71ec0027f23397aedd3d8c46d6",
+      "output_bytes": 841,
+      "source_sha256_unchanged": true
+    },
+    {
+      "suite": "tests/port-change.sh",
+      "started_at_utc": "2026-11-04T02:31:54.973817+00:00",
+      "finished_at_utc": "2026-11-04T02:31:55.029041+00:00",
+      "duration_seconds": 0.055,
+      "exit_code": 0,
+      "status": "passed",
+      "timed_out": false,
+      "test_sha256": "3aabe799e1d7c8239aaac4be1a3d05027a80d87036a41adafb2f026ba4fa0ca9",
+      "output_bytes": 213,
+      "source_sha256_unchanged": true
+    },
+    {
+      "suite": "tests/auto-update.sh",
+      "started_at_utc": "2026-11-04T02:31:55.029518+00:00",
+      "finished_at_utc": "2026-11-04T02:31:55.501850+00:00",
+      "duration_seconds": 1.667,
+      "exit_code": 0,
+      "status": "passed",
+      "timed_out": false,
+      "test_sha256": "08548a24a5751a0a310b2dc561d751c1a30e47c8f49f12bcc8e8e1851c2c770d",
+      "output_bytes": 427,
+      "source_sha256_unchanged": true
+    },
+    {
+      "suite": "tests/rollback.sh",
+      "started_at_utc": "2026-11-04T02:31:55.502618+00:00",
+      "finished_at_utc": "2026-11-04T02:31:56.033125+00:00",
+      "duration_seconds": 0.531,
+      "exit_code": 0,
+      "status": "passed",
+      "timed_out": false,
+      "test_sha256": "a76d3dd8508f2b97ea4b22994e88de758de80c7a07a1a03351a2b5f4fde6c5e0",
+      "output_bytes": 28,
+      "source_sha256_unchanged": true
+    },
+    {
+      "suite": "tests/static.sh",
+      "started_at_utc": "2026-11-04T02:31:56.033703+00:00",
+      "finished_at_utc": "2026-11-04T02:31:58.573087+00:00",
+      "duration_seconds": 2.539,
+      "exit_code": 0,
+      "status": "passed",
+      "timed_out": false,
+      "test_sha256": "460a78b3e88fce569c9a3c1d90f4a79e30b0c718e315c56ad1521956bd7445fc",
+      "output_bytes": 190,
+      "source_sha256_unchanged": true
+    }
+  ],
+  "exclusions": [
+    "No production server or installed production configuration accessed",
+    "No real provider IP replacement",
+    "No verification of external client reachability, NAT or cloud firewall behavior",
+    "No production credentials or data used",
+    "New address-refresh regression suite is recorded separately",
+    "No GitHub publication or deployment performed by this run",
+    "Real Xray was used for generated-configuration validation; this is not an external end-to-end protocol connectivity test"
+  ],
+  "cleanup": {
+    "test_owned_fixtures": "No new suite fixture directories remain",
+    "isolated_snapshot_and_verified_runtime_retained": true,
+    "raw_logs_excluded_from_report": true,
+    "new_remaining_fixture_directory_count": 0,
+    "checked_fixture_name_patterns": [
+      "xray-chain-test.*",
+      "xray-chain-rollback-test.*",
+      "xray-chain-port-test.*",
+      "xray-chain.autoupdate-test.*"
+    ]
+  },
+  "dependency_check": {
+    "required": [
+      "bash",
+      "python3",
+      "jq",
+      "curl",
+      "sha256sum",
+      "unzip",
+      "ss"
+    ],
+    "missing": [],
+    "shellcheck_available": false
+  },
+  "finished_at_utc": "2026-11-04T02:31:58.573675+00:00",
+  "overall_status": "passed",
+  "latest_worktree_source_matches_test_snapshot": true
+}

@@ -1,0 +1,271 @@
+{
+  "schema_version": 1,
+  "kind": "isolated-regression-test-evidence",
+  "recorded_at": "2026-11-04T02:35:53.551445+00:00",
+  "scope": "Read-only IPv4 refresh for displayed share links and QR payloads; saved state/configuration preservation.",
+  "environment": {
+    "platform": "WSL Linux",
+    "runtime": [
+      "Bash",
+      "jq",
+      "Python 3"
+    ],
+    "network": "stubbed",
+    "service_operations": "forbidden by test boundary",
+    "shellcheck": "unavailable"
+  },
+  "runs": [
+    {
+      "phase": "red",
+      "source_version": "0.2.19",
+      "execution_date": "2026-11-04",
+      "completed_before": "2026-11-04T02:34:30.902985+00:00",
+      "timestamp_precision": "day; exact original run timestamps were not recorded",
+      "command": "bash tests/address-refresh.sh shared single",
+      "result": "expected_failure",
+      "exit_code": 1,
+      "total": 2,
+      "passed": 0,
+      "failed": 2,
+      "cases": [
+        "shared (TTY, 30 nodes)",
+        "single (TTY, paused node)"
+      ],
+      "failure_reason": "Displayed links retained the saved address instead of the verified replacement address.",
+      "source_sha256": null,
+      "test_sha256": null,
+      "hash_note": "The initial red-run byte snapshots were not retained; no later source/test hashes are attributed to that run."
+    },
+    {
+      "phase": "green",
+      "source_version": "0.2.20",
+      "execution_date": "2026-11-04",
+      "completed_before": "2026-11-04T02:34:30.902985+00:00",
+      "timestamp_precision": "day; exact original run timestamps were not recorded",
+      "command": "bash -n tests/address-refresh.sh; bash tests/address-refresh.sh",
+      "result": "passed",
+      "exit_code": 0,
+      "total": 33,
+      "passed": 33,
+      "failed": 0,
+      "source_sha256": "9d624a993081af23dcf315cd8c745b178ab9b64727cccd06c6af7fdf01f58de2",
+      "test_sha256": "48ebd8bc86423613bd271b23fa02b6be3bac97add6b75d21e4267fdea1b8226a",
+      "hash_note": "Hashes verified from the retained isolated WSL snapshot before the CGNAT fixture representation change.",
+      "cases": [
+        {
+          "name": "shared",
+          "output": "TTY",
+          "result": "passed"
+        },
+        {
+          "name": "mixed",
+          "output": "TTY",
+          "result": "passed"
+        },
+        {
+          "name": "independent",
+          "output": "TTY",
+          "result": "passed"
+        },
+        {
+          "name": "mixed",
+          "output": "pipe",
+          "result": "passed"
+        },
+        {
+          "name": "single",
+          "output": "TTY",
+          "result": "passed"
+        },
+        {
+          "name": "schema1",
+          "output": "TTY",
+          "result": "passed"
+        },
+        {
+          "name": "repeated",
+          "output": "TTY",
+          "result": "passed"
+        },
+        {
+          "name": "saved-present",
+          "output": "TTY",
+          "result": "passed"
+        },
+        {
+          "name": "domain",
+          "output": "pipe",
+          "result": "passed"
+        },
+        {
+          "name": "disabled",
+          "output": "pipe",
+          "result": "passed"
+        },
+        {
+          "name": "multiple-public",
+          "output": "pipe",
+          "result": "passed"
+        },
+        {
+          "name": "nat",
+          "output": "pipe",
+          "result": "passed"
+        },
+        {
+          "name": "probe-failure",
+          "output": "pipe",
+          "result": "passed"
+        },
+        {
+          "name": "probe-fallback",
+          "output": "TTY",
+          "result": "passed"
+        },
+        {
+          "name": "probe-failed-body",
+          "output": "pipe",
+          "result": "passed"
+        },
+        {
+          "name": "ip-failed-json",
+          "output": "pipe",
+          "result": "passed"
+        },
+        {
+          "name": "invalid-probe",
+          "output": "pipe",
+          "result": "passed"
+        },
+        {
+          "name": "ip-failure",
+          "output": "pipe",
+          "result": "passed"
+        },
+        {
+          "name": "invalid-json",
+          "output": "pipe",
+          "result": "passed"
+        },
+        {
+          "name": "invalid-local",
+          "output": "pipe",
+          "result": "passed"
+        },
+        {
+          "name": "private-10",
+          "output": "pipe",
+          "result": "passed"
+        },
+        {
+          "name": "private-172",
+          "output": "pipe",
+          "result": "passed"
+        },
+        {
+          "name": "private-192",
+          "output": "pipe",
+          "result": "passed"
+        },
+        {
+          "name": "loopback",
+          "output": "pipe",
+          "result": "passed"
+        },
+        {
+          "name": "cgnat",
+          "output": "pipe",
+          "result": "passed"
+        },
+        {
+          "name": "link-local",
+          "output": "pipe",
+          "result": "passed"
+        },
+        {
+          "name": "mixed-private",
+          "output": "pipe",
+          "result": "passed"
+        },
+        {
+          "name": "duplicate-public",
+          "output": "pipe",
+          "result": "passed"
+        },
+        {
+          "name": "pure-builder",
+          "output": "pipe",
+          "result": "passed"
+        },
+        {
+          "name": "override-builder",
+          "output": "pipe",
+          "result": "passed"
+        },
+        {
+          "name": "override-connection",
+          "output": "pipe",
+          "result": "passed"
+        },
+        {
+          "name": "override-all",
+          "output": "TTY",
+          "result": "passed"
+        },
+        {
+          "name": "no-leak",
+          "output": "TTY",
+          "result": "passed"
+        }
+      ]
+    },
+    {
+      "phase": "targeted-reverification",
+      "source_version": "0.2.20",
+      "started_at": "2026-11-04T02:35:02.465215+00:00",
+      "completed_at": "2026-11-04T02:35:03.488674+00:00",
+      "command": "bash -n tests/address-refresh.sh; bash tests/address-refresh.sh cgnat mixed-private",
+      "result": "passed",
+      "exit_code": 0,
+      "total": 2,
+      "passed": 2,
+      "failed": 0,
+      "source_sha256": "9d624a993081af23dcf315cd8c745b178ab9b64727cccd06c6af7fdf01f58de2",
+      "test_sha256": "48056c680c705b98cd37af3544da2fb91e6a6bb615b83c59099096a6dbf641ae",
+      "cases": [
+        "cgnat (pipe)",
+        "mixed-private (pipe)"
+      ],
+      "reason": "Represent the same CGNAT test addresses with integer-octet joins so the existing preflight literal-address check remains unchanged. Production source and fixture address semantics were unchanged."
+    }
+  ],
+  "verified_properties": [
+    "Full URI comparisons preserve all fields except the expected displayed address.",
+    "QR payloads match displayed links byte for byte.",
+    "Thirty-node shared, mixed and independent-port fixtures include paused and direct nodes; schema 1 is covered.",
+    "Each show resolves once; a subsequent show probes again rather than caching an old result.",
+    "Default link construction remains a pure read of the saved address, including after an earlier refreshed show.",
+    "Saved state and rendered configuration bytes remain unchanged in every scenario.",
+    "A verified changed address updates the displayed direct exit only; SOCKS exit records remain unchanged.",
+    "Domain, disabled refresh, retained local old address, ambiguous local addresses, NAT, unsafe ranges and discovery errors preserve the saved address."
+  ],
+  "cleanup": {
+    "per_case_fixtures": "removed automatically by TemporaryDirectory",
+    "managed_files": "only isolated synthetic fixtures used",
+    "host_service_changes": "none",
+    "test_harness_snapshot": "retained temporarily for inspection"
+  },
+  "exclusions": [
+    "No real public network requests or public address measurement.",
+    "No real systemd/service restart, VPS deployment, firewall changes or SSH interruption experiment.",
+    "No customer configuration, credentials, private keys, share links, raw logs or personal absolute paths are included.",
+    "These isolated results do not establish reachability from customer networks."
+  ],
+  "owner_actions": {
+    "required_for_these_isolated_checks": []
+  },
+  "publication": {
+    "report_saved_locally": true,
+    "github_upload": "not performed by this test task"
+  }
+}

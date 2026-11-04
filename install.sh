@@ -5,7 +5,7 @@
 set -Eeuo pipefail
 umask 077
 
-SCRIPT_VERSION="0.2.19"
+SCRIPT_VERSION="0.2.20"
 CURRENT_STATE_SCHEMA=2
 SERVICE_NAME="xray-chain.service"
 RUNTIME_USER="xray-chain"
@@ -934,14 +934,17 @@ strip_ipv6_brackets() {
 
 detect_public_ipv4() {
   local endpoint result=''
+  local connect_timeout="${1:-4}" max_time="${2:-6}"
   local -a endpoints=(
     'https://api.ipify.org'
     'https://ipv4.icanhazip.com'
     'https://ifconfig.me/ip'
   )
   for endpoint in "${endpoints[@]}"; do
-    result="$(curl --disable -4 --fail --silent --show-error --noproxy '*' --connect-timeout 4 --max-time 6 \
-      "$endpoint" 2>/dev/null || true)"
+    if ! result="$(curl --disable -4 --fail --silent --show-error --noproxy '*' \
+      --connect-timeout "$connect_timeout" --max-time "$max_time" "$endpoint" 2>/dev/null)"; then
+      continue
+    fi
     result="${result//[[:space:]]/}"
     if valid_ipv4 "$result"; then
       printf '%s' "$result"
@@ -949,6 +952,57 @@ detect_public_ipv4() {
     fi
   done
   return 1
+}
+
+eligible_share_ipv4() {
+  local address="$1" a b c d
+  valid_ipv4 "$address" || return 1
+  IFS='.' read -r a b c d <<<"$address"
+  a=$((10#$a)); b=$((10#$b)); c=$((10#$c))
+  # scope=global also includes private addresses; they are not public entrances.
+  (( a != 0 && a != 10 && a != 127 && a < 224 )) || return 1
+  (( a != 100 || b < 64 || b > 127 )) || return 1
+  (( a != 169 || b != 254 )) || return 1
+  (( a != 172 || b < 16 || b > 31 )) || return 1
+  (( a != 192 || (b != 168 && (b != 0 || c != 0) && (b != 88 || c != 99)) )) || return 1
+  (( a != 198 || (b != 18 && b != 19) )) || return 1
+}
+
+resolve_share_address() {
+  local saved local_json local_addresses address detected candidate=''
+  local candidate_count=0
+  saved="$(jq -er '.serverAddress' "$STATE_FILE")" || return 1
+  if [[ "${XRAY_CHAIN_AUTO_ADDRESS:-1}" == '0' ]] || ! valid_ipv4 "$saved"; then
+    printf '%s' "$saved"
+    return 0
+  fi
+  if ! local_json="$(ip -j -4 address show scope global 2>/dev/null)" \
+    || ! local_addresses="$(jq -er '
+      if type != "array" then error("invalid address list") else
+        [.[] | .addr_info[]? | select(.family == "inet" and .scope == "global")
+          | .local | select(type == "string")] | unique | .[]
+      end' <<<"$local_json" 2>/dev/null)"; then
+    printf '%s' "$saved"
+    return 0
+  fi
+  while IFS= read -r address; do
+    if [[ "$address" == "$saved" ]]; then
+      printf '%s' "$saved"
+      return 0
+    fi
+    if eligible_share_ipv4 "$address"; then
+      candidate="$address"
+      ((candidate_count += 1))
+    fi
+  done <<<"$local_addresses"
+  if (( candidate_count == 1 )); then
+    detected="$(detect_public_ipv4 2 3 2>/dev/null || true)"
+    if [[ "$detected" == "$candidate" ]]; then
+      printf '%s' "$candidate"
+      return 0
+    fi
+  fi
+  printf '%s' "$saved"
 }
 
 state_value() {
@@ -2485,6 +2539,10 @@ build_share_link() {
   [[ -r "$STATE_FILE" ]] || die "未找到安装状态：$STATE_FILE"
   schema="$(jq -r '.schema // 1' "$STATE_FILE")"
   address="$(jq -er '.serverAddress' "$STATE_FILE")"
+  if [[ -n "${2:-}" ]]; then
+    valid_ipv4_or_domain "$2" || die "客户端显示地址无效。"
+    address="$2"
+  fi
   port="$(jq -er '.inboundPort' "$STATE_FILE")"
   sni="$(jq -er '.serverName' "$STATE_FILE")"
   if [[ "$schema" == '2' ]]; then
@@ -2587,10 +2645,10 @@ node_enabled() {
 
 show_connection() {
   local selector="${1:-}" footer="${2:-yes}" link node_id outbound_type exit_ip enabled schema
-  local qr_mode="${3:-auto}"
+  local qr_mode="${3:-auto}" display_address="${4:-}"
   select_node_id "$STATE_FILE" "$selector"
   node_id="$SELECTED_NODE_ID"
-  link="$(build_share_link "$node_id")"
+  link="$(build_share_link "$node_id" "$display_address")"
   outbound_type="$(node_outbound_type "$node_id")"
   enabled="$(node_enabled "$node_id")"
   schema="$(jq -r '.schema // 1' "$STATE_FILE")"
@@ -2614,6 +2672,11 @@ show_connection() {
     qrencode -t ANSIUTF8 "$link" || true
   fi
   if [[ "$outbound_type" == 'direct' ]]; then
+    # A changed display address has passed the local/public-IP agreement check.
+    if [[ -n "$display_address" ]] && valid_ipv4 "$display_address" \
+      && [[ "$display_address" != "$(jq -er '.serverAddress' "$STATE_FILE")" ]]; then
+      exit_ip="$display_address"
+    fi
     printf '\n出口 IP：%s（VPS 本机）\n' "${exit_ip:-未验证}"
   else
     printf '\n出口 IP：%s\n' "${exit_ip:-未验证}"
@@ -2625,14 +2688,14 @@ show_connection() {
 }
 
 show_all_connections() {
-  local schema node_id
+  local schema node_id display_address="${1:-}"
   schema="$(jq -r '.schema // 1' "$STATE_FILE")"
   if [[ "$schema" == '2' ]]; then
     while IFS= read -r node_id; do
-      show_connection "$node_id" no
+      show_connection "$node_id" no auto "$display_address"
     done < <(jq -r '.nodes | sort_by(.number)[] | .id' "$STATE_FILE")
   else
-    show_connection node-1 no
+    show_connection node-1 no auto "$display_address"
   fi
   show_brand_footer
 }
@@ -2946,13 +3009,14 @@ command_list() {
 }
 
 command_show() {
-  local selector="${1:-}"
+  local selector="${1:-}" display_address
   require_root
   [[ -r "$STATE_FILE" ]] || die "PuppyIP Chain 尚未安装。"
+  display_address="$(resolve_share_address)"
   if [[ "$selector" == 'all' || -z "$selector" ]]; then
-    show_all_connections
+    show_all_connections "$display_address"
   else
-    show_connection "$selector"
+    show_connection "$selector" yes auto "$display_address"
   fi
 }
 
@@ -3626,6 +3690,7 @@ usage() {
   XRAY_CHAIN_UDP_MODE=block|proxy     新节点 UDP 策略；默认 proxy
   XRAY_CHAIN_ENABLE_BBR=1|0           自动启用 BBR；默认 1，设为 0 时不修改 TCP 参数
   XRAY_CHAIN_AUTO_UPDATE=1|0          打开管理菜单时自动更新脚本；默认 1，设为 0 跳过
+  XRAY_CHAIN_AUTO_ADDRESS=1|0         查看时自动使用当前本机公网 IP；固定数字中转入口设为 0
   XRAY_CHAIN_ALLOW_UNVERIFIED=1      非交互模式允许跳过失败的联网验证
 EOF
 }
