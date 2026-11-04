@@ -81,6 +81,15 @@ else
 fi
 chmod +x "$TEST_XRAY"
 
+# Runtime downloads above are explicit; all application probes below are local
+# fixtures. Keep the saved entrance assigned and the direct exit deterministic.
+curl() { printf 'Unexpected network request\n' >&2; return 99; }
+ip() {
+  [[ "$*" == '-j -4 address show scope global' ]] || return 99
+  jq '[{addr_info: [{family: "inet", scope: "global", local: .serverAddress}]}]' "$STATE_FILE"
+}
+detect_public_ipv4() { printf '%s\n' '203.0.113.10'; }
+
 prepare_manager_copy "${TEST_DIR}/manager"
 cmp -s "${ROOT_DIR}/install.sh" "${TEST_DIR}/manager"
 

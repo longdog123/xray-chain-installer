@@ -7,7 +7,9 @@ umask 077
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 run_worker() {
-  local scenario="$1" case_dir="$2"
+  local scenario="$1" case_dir="$2" network_scenario="${1#list-}"
+  network_scenario="${network_scenario#socks-only-}"
+  network_scenario="${network_scenario#edit-direct-}"
   # shellcheck source=../install.sh
   source "${ROOT_DIR}/install.sh"
   STATE_FILE="${case_dir}/state.json"
@@ -18,17 +20,19 @@ run_worker() {
   render_config "$CONFIG_FILE" "$case_dir" "$MODEL_FILE" "$SECRETS_FILE"
   cp -- "$STATE_FILE" "${case_dir}/before-state.json"
   cp -- "$CONFIG_FILE" "${case_dir}/before-config.json"
+  cp -- "$MODEL_FILE" "${case_dir}/before-render-state.json"
+  cp -- "$SECRETS_FILE" "${case_dir}/before-secrets.json"
   unset XRAY_CHAIN_AUTO_ADDRESS
-  [[ "$scenario" != 'disabled' ]] || export XRAY_CHAIN_AUTO_ADDRESS=0
+  [[ "$network_scenario" != 'disabled' ]] || export XRAY_CHAIN_AUTO_ADDRESS=0
   require_root() { :; }
   prompt_yes_no() { printf 'Unexpected confirmation\n' >>"${case_dir}/forbidden"; return 99; }
   systemctl() { printf 'Unexpected service operation\n' >>"${case_dir}/forbidden"; return 99; }
   ip() {
     printf '%s\n' "$*" >>"${case_dir}/ip-calls"
     [[ "$*" == '-j -4 address show scope global' ]] || return 99
-    [[ "$scenario" != 'ip-failure' ]] || return 1
+    [[ "$network_scenario" != 'ip-failure' ]] || return 1
     cat -- "${case_dir}/local-addresses.json"
-    [[ "$scenario" != 'ip-failed-json' ]]
+    [[ "$network_scenario" != 'ip-failed-json' ]]
   }
   curl() {
     printf '%s\n' "${!#}" >>"${case_dir}/curl-calls"
@@ -36,10 +40,10 @@ run_worker() {
       https://api.ipify.org|https://ipv4.icanhazip.com|https://ifconfig.me/ip) ;;
       *) printf 'Unexpected network endpoint\n' >>"${case_dir}/forbidden"; return 99 ;;
     esac
-    [[ "$scenario" != 'probe-failure' ]] || return 28
-    if [[ "$scenario" == 'probe-fallback' && "${!#}" != 'https://ifconfig.me/ip' ]]; then return 28; fi
+    [[ "$network_scenario" != 'probe-failure' ]] || return 28
+    if [[ "$network_scenario" == 'probe-fallback' && "${!#}" != 'https://ifconfig.me/ip' ]]; then return 28; fi
     cat -- "${case_dir}/probe-address"
-    [[ "$scenario" != 'probe-failed-body' ]]
+    [[ "$network_scenario" != 'probe-failed-body' ]]
   }
   qrencode() {
     [[ "$1" == '-t' && "$2" == 'ANSIUTF8' && "$3" == vless://* ]] || return 99
@@ -47,10 +51,26 @@ run_worker() {
   }
 
   case "$scenario" in
+    standalone-connection) show_connection node-2 ;;
+    standalone-direct) show_connection node-3 ;;
+    standalone-all) show_all_connections ;;
+    by-id) show_connections_by_id node-2 node-3 ;;
+    preview)
+      prepare_connection_preview "$STATE_FILE" "${case_dir}/preview.txt" node-2 node-3
+      cat -- "${case_dir}/preview.txt"
+      ;;
+    list|list-*) print_node_list_file "$STATE_FILE" ;;
+    edit-direct|edit-direct-*)
+      collect_socks_settings edit node-3 <<< ''
+      printf '__INPUT_CHANGED__:%s\n' "$SOCKS_INPUT_CHANGED"
+      ;;
     pure-builder) build_share_link node-2; printf '\n' ;;
     override-builder) build_share_link node-2 '203.0.113.20'; printf '\n' ;;
     override-connection) show_connection node-2 no yes '203.0.113.20' ;;
     override-all) show_all_connections '203.0.113.20' ;;
+    override-direct) show_connection node-3 no yes 'fixed-entry.example.com' '198.51.100.30' ;;
+    override-all-direct) show_all_connections 'fixed-entry.example.com' '198.51.100.30' ;;
+    override-failed-direct) show_connection node-3 no yes 'fixed-entry.example.com' '' ;;
     single) command_show 2 ;;
     no-leak)
       command_show all
@@ -110,6 +130,12 @@ cases = [
     ("mixed-private", False), ("duplicate-public", False),
     ("pure-builder", False), ("override-builder", False),
     ("override-connection", False), ("override-all", True), ("no-leak", True),
+    ("standalone-connection", True), ("standalone-direct", True), ("standalone-all", True),
+    ("by-id", True), ("preview", True), ("preview", False), ("list", False),
+    ("list-domain", False), ("list-disabled", False), ("list-probe-failure", False),
+    ("override-direct", False), ("override-all-direct", True), ("override-failed-direct", False),
+    ("socks-only-domain", False), ("socks-only-disabled", False), ("socks-only-saved-present", False),
+    ("edit-direct", False), ("edit-direct-probe-failure", False),
 ]
 if len(sys.argv) > 2:
     cases = [case for case in cases if case[0] in sys.argv[2:]]
@@ -120,8 +146,18 @@ def require(condition, message):
         raise AssertionError(message)
 
 
+def network_scenario(scenario):
+    for prefix in ("list-", "socks-only-", "edit-direct-"):
+        if scenario.startswith(prefix):
+            scenario = scenario[len(prefix):]
+    return scenario
+
+
 def fixture(scenario, folder):
-    count = 30 if scenario in {"shared", "mixed", "independent"} else 3
+    count = 30 if scenario in {"shared", "mixed", "independent", "standalone-all", "list"} else 3
+    if scenario.startswith("socks-only-"):
+        count = 2
+    scenario = network_scenario(scenario)
     nodes = []
     for number in range(1, count + 1):
         node = dict(id=f"node-{number}", number=number, name=f"Fixture exit {number}",
@@ -236,50 +272,89 @@ with tempfile.TemporaryDirectory(prefix="puppyip-address-fixture.") as directory
         name = f"{scenario} ({'TTY' if terminal else 'pipe'})"
         try:
             state = fixture(scenario, folder)
+            probe_address = (folder / "probe-address").read_text()
             status, output = capture(scenario, folder, terminal)
             require(status == 0, f"unexpected status {status}: {output}")
             output = re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", output).replace("\r", "")
             nodes = state.get("nodes", [dict(id="node-1", uuid=state.get("uuid"), shortId=state.get("shortId"),
                                             spiderX="/", name=state.get("nodeName"))])
-            if scenario in {"single", "pure-builder", "override-builder", "override-connection"}:
+            if scenario in {"single", "pure-builder", "override-builder", "override-connection", "standalone-connection"}:
                 nodes = [node for node in nodes if node["id"] == "node-2"]
+            elif scenario in {"standalone-direct", "override-direct", "override-failed-direct"}:
+                nodes = [node for node in nodes if node["id"] == "node-3"]
+            elif scenario in {"by-id", "preview"}:
+                nodes = [node for node in nodes if node["id"] in {"node-2", "node-3"}]
             refreshed = scenario in {"shared", "mixed", "independent", "single", "schema1", "repeated", "probe-fallback", "no-leak",
-                                     "mixed-private", "duplicate-public", "override-builder", "override-connection", "override-all"}
+                                     "mixed-private", "duplicate-public", "override-builder", "override-connection", "override-all",
+                                     "standalone-connection", "standalone-direct", "standalone-all", "by-id", "preview", "list"}
             address = "203.0.113.20" if refreshed else state["serverAddress"]
+            if scenario in {"override-direct", "override-all-direct", "override-failed-direct"}:
+                address = "fixed-entry.example.com"
             expected = [link(state, node, address) for node in nodes]
             if scenario == "repeated":
                 expected += [link(state, node, "203.0.113.30") for node in nodes]
-            qr_expected = expected[:] if terminal or scenario == "override-connection" else []
+            qr_expected = expected[:] if terminal or scenario in {"override-connection", "override-direct", "override-failed-direct"} else []
             if scenario == "no-leak":
                 expected += [link(state, nodes[1], state["serverAddress"])]
+            list_only = scenario == "list" or scenario.startswith("list-")
+            edit_only = scenario == "edit-direct" or scenario.startswith("edit-direct-")
+            if list_only or edit_only:
+                expected = []
+                qr_expected = []
             actual = re.findall(r"^vless://[^\s]+$", output, flags=re.MULTILINE)
             require(actual == expected, f"displayed links differ beyond the expected address (expected {address})")
             require(lines(folder, "qr-links") == qr_expected, "QR inputs did not exactly match displayed links")
-            if scenario not in {"pure-builder", "override-builder"}:
+            probe_failed = network_scenario(scenario) in {
+                "probe-failure", "probe-failed-body", "invalid-probe",
+                "private-10", "private-172", "private-192", "loopback", "cgnat", "link-local"
+            }
+            direct_address = "未验证" if probe_failed else probe_address
+            if scenario in {"override-direct", "override-all-direct"}:
+                direct_address = "198.51.100.30"
+            elif scenario == "override-failed-direct":
+                direct_address = "未验证"
+            elif scenario == "override-all":
+                direct_address = address
+            if edit_only:
+                require(re.findall(r"当前出口：VPS 本机直连 · ([^\n]+)", output) == [direct_address],
+                        "edit prompt did not refresh the direct exit")
+                require("__INPUT_CHANGED__:no" in output, "empty edit input was treated as an outbound change")
+            elif list_only:
+                require(re.findall(r"VPS 本机直连 · 公网 IPv4：([^\n]+)", output)
+                        == [direct_address] * sum(node["type"] == "direct" for node in nodes),
+                        "node list did not refresh every direct exit")
+                require(re.findall(r"实际出口：([^\n]+)", output) == [node["exitIp"] for node in nodes if node["type"] == "socks"],
+                        "node list changed a SOCKS exit")
+                require("已暂停" in output and len(re.findall(r"入口端口：", output)) == len(nodes),
+                        "node list lost paused status or per-node ports")
+            elif scenario not in {"pure-builder", "override-builder"}:
                 expected_exits = []
                 for display_address in ([address, "203.0.113.30"] if scenario == "repeated" else [address]):
                     for node in nodes:
                         if node.get("type") == "direct":
-                            exit_address = display_address if refreshed else node["exitIp"]
+                            exit_address = display_address if scenario == "repeated" else direct_address
                             expected_exits.append(f"{exit_address}（VPS 本机）")
                         else:
                             expected_exits.append(node.get("exitIp", "未验证"))
                 require(re.findall(r"^出口 IP：([^\n]+)$", output, flags=re.MULTILINE) == expected_exits,
                         "displayed direct exit did not refresh, or a SOCKS exit changed")
-            for filename in ("state", "config"):
+            for filename in ("state", "config", "render-state", "secrets"):
                 require((folder / f"{filename}.json").read_bytes() == (folder / f"before-{filename}.json").read_bytes(),
                         f"show modified saved {filename}")
             require(not lines(folder, "forbidden"), "show performed a service, confirmation or unexpected network operation")
             ip_calls = lines(folder, "ip-calls")
             curl_calls = lines(folder, "curl-calls")
-            pure = scenario in {"domain", "disabled", "pure-builder", "override-builder", "override-connection", "override-all"}
-            require(len(ip_calls) == (0 if pure else 2 if scenario == "repeated" else 1),
+            environment = network_scenario(scenario)
+            pure = scenario in {"pure-builder", "override-builder", "override-connection", "override-all",
+                                "override-direct", "override-all-direct", "override-failed-direct"}
+            no_local_lookup = pure or list_only or edit_only or environment in {"domain", "disabled"}
+            require(len(ip_calls) == (0 if no_local_lookup else 2 if scenario == "repeated" else 1),
                     "local address discovery did not occur exactly once per show")
-            if pure or scenario in {"saved-present", "multiple-public", "ip-failure", "ip-failed-json", "invalid-json", "invalid-local",
-                                    "private-10", "private-172", "private-192", "loopback", "cgnat", "link-local"}:
-                require(not curl_calls, "ambiguous, fixed or unsafe local address triggered public probing")
+            no_probe_needed = scenario.startswith("socks-only-") and environment in {"domain", "disabled", "saved-present"}
+            if pure or no_probe_needed:
+                require(not curl_calls, "pure builder or explicit display context triggered public probing")
             else:
-                expected_probes = 2 if scenario == "repeated" else 3 if scenario in {"probe-failure", "probe-failed-body", "probe-fallback", "invalid-probe"} else 1
+                expected_probes = 2 if scenario == "repeated" else 3 if environment in {"probe-failure", "probe-failed-body", "probe-fallback", "invalid-probe"} else 1
                 require(len(curl_calls) == expected_probes, "public probing was repeated per node or cached between shows")
             if scenario == "single":
                 require("状态：已暂停" in output, "single paused node lost its displayed state")

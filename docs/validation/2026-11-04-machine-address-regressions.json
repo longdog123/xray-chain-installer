@@ -1,0 +1,159 @@
+{
+  "schema": 1,
+  "kind": "isolated_regression_tests",
+  "installer_version": "0.2.22",
+  "started_at_utc": "2026-11-04T09:53:18.536303+00:00",
+  "source_base_commit": "7cd498f4386c9481e97d3bd3299a58f31f582454",
+  "source_snapshot_has_uncommitted_changes": true,
+  "source_sha256": "0bdf126bcded0575bd07e960310fc8b5cd727dbef2e2f15233c33a3558a87774",
+  "runtime_version": "Xray 26.3.27 (Xray, Penetrates Everything.) d2758a0 (go1.26.1 linux/amd64)",
+  "runtime_files_sha256": {
+    "xray": "8255dd939c34cf966cc91517b6324dd3c8d0bcf49ffac8beca049a38c46845ed",
+    "geoip.dat": "744c97b74c52bae2ac8664fef6ac481d7765cb8432a0df54f0368a88b9b4a354",
+    "geosite.dat": "adf92de0cfc70e458b399f04c5f912bf42d115ed7e37281b30e2f1c68605e4e9"
+  },
+  "runtime_reused_from": "2026-11-04-address-refresh-regressions.json",
+  "reason": "0.2.22 refreshes all machine-address displays and changes SOCKS response verification; regressions are rerun for this changed behavior.",
+  "previous_behavior_evidence": "2026-11-04-required-update-regressions.json",
+  "environment": {
+    "os": "Ubuntu 24.04 LTS on isolated WSL",
+    "architecture": "x86_64",
+    "network": "Every suite runs under unshare --net; no external network access",
+    "shellcheck_available": false
+  },
+  "results": [
+    {
+      "suite": "tests/integration.sh",
+      "started_at_utc": "2026-11-04T09:53:18.546520+00:00",
+      "completed_at_utc": "2026-11-04T09:53:21.156977+00:00",
+      "elapsed_seconds": 4.182,
+      "exit_code": 0,
+      "status": "passed",
+      "timed_out": false,
+      "test_sha256": "8ab89bc9778efa9402bdf43fa956b7e70b3c4a377fd433b6d4ade25f2beab697",
+      "source_sha256_unchanged": true,
+      "timing_note": "UTC endpoint difference is 2.610457 seconds whereas monotonic elapsed is 4.182 seconds. Both original measurements are retained; the reason for the clock discrepancy was not determined."
+    },
+    {
+      "suite": "tests/add-preview.sh",
+      "started_at_utc": "2026-11-04T09:53:21.158025+00:00",
+      "completed_at_utc": "2026-11-04T09:53:32.959356+00:00",
+      "elapsed_seconds": 11.801,
+      "exit_code": 0,
+      "status": "passed",
+      "timed_out": false,
+      "test_sha256": "cb11fa9c8c812c1602a4254ab2efdd005d9639cb458bf9c0e488f417d17ba34a",
+      "source_sha256_unchanged": true
+    },
+    {
+      "suite": "tests/port-change.sh",
+      "started_at_utc": "2026-11-04T09:53:32.959763+00:00",
+      "completed_at_utc": "2026-11-04T09:53:33.022414+00:00",
+      "elapsed_seconds": 0.063,
+      "exit_code": 0,
+      "status": "passed",
+      "timed_out": false,
+      "test_sha256": "3aabe799e1d7c8239aaac4be1a3d05027a80d87036a41adafb2f026ba4fa0ca9",
+      "source_sha256_unchanged": true
+    },
+    {
+      "suite": "tests/rollback.sh",
+      "started_at_utc": "2026-11-04T09:53:33.022697+00:00",
+      "completed_at_utc": "2026-11-04T09:53:33.616718+00:00",
+      "elapsed_seconds": 0.594,
+      "exit_code": 0,
+      "status": "passed",
+      "timed_out": false,
+      "test_sha256": "a76d3dd8508f2b97ea4b22994e88de758de80c7a07a1a03351a2b5f4fde6c5e0",
+      "source_sha256_unchanged": true
+    },
+    {
+      "suite": "tests/auto-update.sh",
+      "started_at_utc": "2026-11-04T09:53:33.617076+00:00",
+      "completed_at_utc": "2026-11-04T09:53:37.442072+00:00",
+      "elapsed_seconds": 3.825,
+      "exit_code": 0,
+      "status": "passed",
+      "timed_out": false,
+      "test_sha256": "23cdbaf20a4ad10761c03dc1a7a02aeb6efe49b49e7669c95bb3420fa679d6d2",
+      "source_sha256_unchanged": true
+    },
+    {
+      "suite": "tests/static.sh",
+      "started_at_utc": "2026-11-04T09:53:37.442544+00:00",
+      "completed_at_utc": "2026-11-04T09:53:40.384234+00:00",
+      "elapsed_seconds": 2.942,
+      "exit_code": 0,
+      "status": "passed",
+      "timed_out": false,
+      "test_sha256": "8df941d4450baf4ff38c6b086a7d48e8f8baff7174e9ff7c611ddecf746033df",
+      "source_sha256_unchanged": true
+    },
+    {
+      "suite": "tests/socks-verification.sh",
+      "started_at_utc": "2026-11-04T09:53:40.384565+00:00",
+      "completed_at_utc": "2026-11-04T09:53:43.170394+00:00",
+      "elapsed_seconds": 2.786,
+      "exit_code": 0,
+      "status": "passed",
+      "timed_out": false,
+      "test_sha256": "4a1568ead9f8b463831cfced321f93fa68a2234fc2cece5e8942f4644ae983cd",
+      "source_sha256_unchanged": true
+    }
+  ],
+  "completed_at_utc": "2026-11-04T09:53:43.171714+00:00",
+  "passed": true,
+  "cleanup": {
+    "new_fixture_directory_count": 6,
+    "checked_fixture_name_patterns": [
+      "xray-chain-test.*",
+      "xray-chain-rollback-test.*",
+      "xray-chain-port-test.*",
+      "xray-chain.autoupdate-test.*",
+      "xray-chain-add-preview.*",
+      "xray-chain-auto-update.*",
+      "puppyip-socks-verification.*",
+      "xray-chain.*"
+    ],
+    "snapshot_and_verified_runtime_retained": true,
+    "raw_test_logs_excluded_from_public_report": true,
+    "residual_fixture_origin": "Six synthetic status-probe directories created during tests/static.sh; only status-validation.log and optional status-node-1.result were present",
+    "safely_removed_owned_fixture_directories": 0,
+    "remaining_owned_fixture_directory_count": 6,
+    "cleanup_status": "incomplete: automatic approval review rejected both scoped recursive cleanup and the smaller exact-file-then-empty-directory cleanup; no deletion was executed",
+    "cleanup_inspected_at_utc": "2026-11-04T09:57:19.2684831+00:00"
+  },
+  "exclusions": [
+    "No production deployment, credentials, configuration or customer data",
+    "No real provider IP replacement",
+    "No external client reachability, DNS, cloud firewall or NAT test",
+    "Real Xray validates generated configurations; no external end-to-end protocol session is established",
+    "Machine-address-specific regression suite recorded separately",
+    "No commit, publication or deployment performed by this runner"
+  ],
+  "source_snapshot_hashes": {
+    "install.sh": "0bdf126bcded0575bd07e960310fc8b5cd727dbef2e2f15233c33a3558a87774",
+    "tests/add-preview.sh": "cb11fa9c8c812c1602a4254ab2efdd005d9639cb458bf9c0e488f417d17ba34a",
+    "tests/address-refresh.sh": "9a888c08324137c8b6001e5398cab2066f9eb4495db2049b53243ccc396d10e1",
+    "tests/auto-update.sh": "23cdbaf20a4ad10761c03dc1a7a02aeb6efe49b49e7669c95bb3420fa679d6d2",
+    "tests/integration.sh": "8ab89bc9778efa9402bdf43fa956b7e70b3c4a377fd433b6d4ade25f2beab697",
+    "tests/port-change.sh": "3aabe799e1d7c8239aaac4be1a3d05027a80d87036a41adafb2f026ba4fa0ca9",
+    "tests/preflight.sh": "6e07f3ca04956161c90c83243f8bba5d2f98cd6a13d45c9a99301af7245e46e4",
+    "tests/rollback.sh": "a76d3dd8508f2b97ea4b22994e88de758de80c7a07a1a03351a2b5f4fde6c5e0",
+    "tests/socks-verification.sh": "4a1568ead9f8b463831cfced321f93fa68a2234fc2cece5e8942f4644ae983cd",
+    "tests/static.sh": "8df941d4450baf4ff38c6b086a7d48e8f8baff7174e9ff7c611ddecf746033df"
+  },
+  "tested_files_match_worktree_at_completion": true,
+  "timing_method": "elapsed_seconds uses time.monotonic around each suite subprocess, including launch and output capture, excluding snapshot preparation and runtime validation; UTC endpoints use the independent system wall clock",
+  "snapshot_hash_scope": "source_snapshot_hashes records all copied shell files. Only suites listed in results were executed. tests/address-refresh.sh was copied and syntax-checked by static, not executed here; its behavioral evidence is maintained separately. tests/preflight.sh was likewise syntax-checked only.",
+  "supporting_test_changed_after_run": "tests/address-refresh.sh received a Python compatibility-only edit after this run; its recorded snapshot hash is intentionally retained and does not claim execution of that later revision",
+  "executed_suite_files_match_worktree_at_finalization": true,
+  "preflight": {
+    "started_at_utc": "2026-11-04T09:58:18.430698+00:00",
+    "completed_at_utc": "2026-11-04T09:58:21.480025+00:00",
+    "elapsed_seconds": 3.062,
+    "exit_code": 0,
+    "test_sha256": "6e07f3ca04956161c90c83243f8bba5d2f98cd6a13d45c9a99301af7245e46e4",
+    "scope": "Final local working tree and Git history; no publication or deployment"
+  }
+}

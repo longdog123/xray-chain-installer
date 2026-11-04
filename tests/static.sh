@@ -10,11 +10,20 @@ bash -n "${ROOT_DIR}/tests/add-preview.sh"
 bash -n "${ROOT_DIR}/tests/port-change.sh"
 bash -n "${ROOT_DIR}/tests/auto-update.sh"
 bash -n "${ROOT_DIR}/tests/address-refresh.sh"
+bash -n "${ROOT_DIR}/tests/socks-verification.sh"
 [[ ! -f "${ROOT_DIR}/tests/preflight.sh" ]] || bash -n "${ROOT_DIR}/tests/preflight.sh"
 
 bash -c '
   set -Eeuo pipefail
   source "$1"
+
+  # Display tests preserve the fixture entrance and never probe the host network.
+  curl() { printf "Unexpected network request\n" >&2; return 99; }
+  ip() {
+    [[ "$*" == "-j -4 address show scope global" ]] || return 99
+    jq "[{addr_info: [{family: \"inet\", scope: \"global\", local: .serverAddress}]}]" "$STATE_FILE"
+  }
+  detect_public_ipv4() { printf "%s\n" "203.0.113.10"; }
 
   valid_ipv4_or_domain "203.0.113.10"
   valid_ipv4_or_domain "proxy.example.com"
@@ -750,7 +759,8 @@ JSON
   set -e
   [[ "$progress_status" == "7" ]]
   eval "$original_progress_function"
-  unset -f curl failing_progress_task
+  unset -f failing_progress_task
+  curl() { printf "Unexpected network request\n" >&2; return 99; }
 
   reuse_source="$fixture_dir/reuse-source"
   reuse_destination="$fixture_dir/reuse-destination"
@@ -800,7 +810,7 @@ JSON
   [[ -x "$remote_manager" ]]
   [[ "$MOCK_MANAGER_URL" == \
     "https://raw.githubusercontent.com/longdog123/xray-chain-installer/0123456789abcdef0123456789abcdef01234567/install.sh" ]]
-  unset -f curl
+  curl() { printf "Unexpected network request\n" >&2; return 99; }
   SCRIPT_SOURCE="$original_script_source"
   bbr_test_dir="$fixture_dir/bbr"
   DATA_DIR="$bbr_test_dir/data"

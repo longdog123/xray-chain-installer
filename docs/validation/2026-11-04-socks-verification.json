@@ -1,0 +1,37 @@
+{
+  "schema": 1,
+  "kind": "isolated-socks-verification",
+  "runs": [
+    {
+      "phase": "red",
+      "started_at": "2026-11-04T09:49:48.864876+00:00",
+      "completed_at": "2026-11-04T09:49:49.248192+00:00",
+      "source_sha256": "2fa076533aa1006bf9c534e954b533a82f24dc5b0c0de93ee471866f546a3c80",
+      "test_sha256": "4a1568ead9f8b463831cfced321f93fa68a2234fc2cece5e8942f4644ae983cd",
+      "syntax_exit_code": 0,
+      "exit_code": 1,
+      "sanitized_output": "FAIL: fallback-second: accepted a failed/invalid response, or rejected a valid fallback\nFAIL: dns-proxy: did not stop at success or try all three endpoints\nFAIL: environment: curl did not disable default curlrc as its first option\nFAIL: helper-failed-body: accepted a failed/invalid response, or rejected a valid fallback\nSOCKS verification checks failed: 4/4\n",
+      "network": "stubbed",
+      "cleanup": "TemporaryDirectory removed"
+    },
+    {
+      "phase": "green",
+      "started_at": "2026-11-04T09:50:48.634270+00:00",
+      "completed_at": "2026-11-04T09:50:51.939880+00:00",
+      "source_sha256": "59b1c7d91784f4f5ab19f15454f7630d2f40a1b299a5a49c5729a4319979be6f",
+      "test_sha256": "4a1568ead9f8b463831cfced321f93fa68a2234fc2cece5e8942f4644ae983cd",
+      "syntax_exit_codes": [
+        0,
+        0
+      ],
+      "exit_code": 0,
+      "sanitized_output": "PASS: success\nPASS: fallback-second\nPASS: fallback-third\nPASS: failed-body-fallback\nPASS: dns-proxy\nPASS: dns-target\nPASS: connection\nPASS: timeout\nPASS: tls-handshake\nPASS: tls-certificate\nPASS: proxy-handshake\nPASS: authentication\nPASS: http-error\nPASS: invalid-body\nPASS: empty-body\nPASS: trailing-dot\nPASS: embedded-whitespace\nPASS: surrounding-whitespace\nPASS: nonzero-body\nPASS: environment\nPASS: allow-unverified\nPASS: saved-old\nPASS: saved-new\nPASS: helper-failed-body\nPASS: helper-silent-failure\nPASS: helper-success\nSOCKS verification checks passed: 26 cases.\n",
+      "network": "stubbed",
+      "cleanup": "TemporaryDirectory removed"
+    }
+  ],
+  "exclusions": [
+    "No production server or real SOCKS endpoint contacted",
+    "Synthetic credentials only; no raw curl stderr or config exported"
+  ]
+}

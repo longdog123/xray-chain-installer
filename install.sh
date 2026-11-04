@@ -5,7 +5,7 @@
 set -Eeuo pipefail
 umask 077
 
-SCRIPT_VERSION="0.2.21"
+SCRIPT_VERSION="0.2.22"
 CURRENT_STATE_SCHEMA=2
 SERVICE_NAME="xray-chain.service"
 RUNTIME_USER="xray-chain"
@@ -996,13 +996,36 @@ resolve_share_address() {
     fi
   done <<<"$local_addresses"
   if (( candidate_count == 1 )); then
-    detected="$(detect_public_ipv4 2 3 2>/dev/null || true)"
+    # Reuse the direct-exit probe from this display, including a failed probe.
+    if (( $# > 0 )); then
+      detected="$1"
+    else
+      detected="$(detect_public_ipv4 2 3 2>/dev/null || true)"
+    fi
     if [[ "$detected" == "$candidate" ]]; then
       printf '%s' "$candidate"
       return 0
     fi
   fi
   printf '%s' "$saved"
+}
+
+detect_display_direct_ip() {
+  local detected
+  detected="$(detect_public_ipv4 2 3 2>/dev/null || true)"
+  eligible_share_ipv4 "$detected" || return 1
+  printf '%s' "$detected"
+}
+
+resolve_display_addresses() {
+  local STATE_FILE="$1"
+  RESOLVED_DIRECT_IP=''
+  if jq -e 'any(.nodes[]?; .type == "direct")' "$STATE_FILE" >/dev/null; then
+    RESOLVED_DIRECT_IP="$(detect_display_direct_ip || true)"
+    RESOLVED_SHARE_ADDRESS="$(resolve_share_address "$RESOLVED_DIRECT_IP")"
+  else
+    RESOLVED_SHARE_ADDRESS="$(resolve_share_address)"
+  fi
 }
 
 state_value() {
@@ -1210,7 +1233,7 @@ collect_global_settings() {
 }
 
 collect_socks_settings() {
-  local mode="$1" node_id="${2:-}" socks_entry
+  local mode="$1" node_id="${2:-}" socks_entry direct_ip
   SOCKS_INPUT_CHANGED='no'
   show_socks_promo "$mode"
 
@@ -1221,8 +1244,8 @@ collect_socks_settings() {
     SOCKS_USER="$(jq -r --arg id "$node_id" '.nodes[] | select(.id == $id) | (.socksUser // "")' "$MODEL_FILE")"
     SOCKS_PASS="$(jq -r --arg id "$node_id" '.[$id] // ""' "$SECRETS_FILE")"
     if [[ "$NODE_TYPE" == 'direct' ]]; then
-      printf '当前出口：VPS 本机直连 · %s\n' \
-        "$(jq -r --arg id "$node_id" '.nodes[] | select(.id == $id) | .exitIp' "$MODEL_FILE")"
+      direct_ip="$(detect_display_direct_ip || true)"
+      printf '当前出口：VPS 本机直连 · %s\n' "${direct_ip:-未验证}"
       IFS= read -r -s -p "SOCKS5: " socks_entry \
         || die "未读取到节点出口信息。"
     else
@@ -1298,12 +1321,13 @@ curl_config_escape() {
 }
 
 verify_socks_proxy() {
-  local work_dir="$1" proxy_host proxy_user proxy_pass config_path exit_ip
+  local work_dir="$1" proxy_host proxy_user proxy_pass config_path diagnostic_path exit_ip
   proxy_host="$SOCKS_HOST"
   [[ "$proxy_host" == *:* ]] && proxy_host="[${proxy_host}]"
   proxy_user="$(curl_config_escape "$SOCKS_USER")"
   proxy_pass="$(curl_config_escape "$SOCKS_PASS")"
   config_path="${work_dir}/curl-socks.conf"
+  diagnostic_path="${work_dir}/curl-socks-errors.txt"
 
   {
     printf 'proxy = "socks5h://%s:%s"\n' "$(curl_config_escape "$proxy_host")" "$SOCKS_PORT"
@@ -1315,11 +1339,14 @@ verify_socks_proxy() {
   chmod 0600 "$config_path"
 
   SOCKS_EXIT_IP=''
-  if exit_ip="$(curl -4 --config "$config_path" 'https://api.ipify.org' 2>/dev/null)" \
+  if exit_ip="$(probe_ipv4_with_curl_config "$config_path" "$diagnostic_path")" \
     && valid_ipv4 "$exit_ip"; then
     SOCKS_EXIT_IP="$exit_ip"
+    rm -f -- "$diagnostic_path"
   else
-    warn "SOCKS5 验证失败，请检查信息或白名单。"
+    warn "SOCKS5 出口验证失败，检测结果如下："
+    if [[ -s "$diagnostic_path" ]]; then cat -- "$diagnostic_path" >&2; fi
+    rm -f -- "$diagnostic_path"
     confirm_continue "仍要写入配置吗？"
   fi
 }
@@ -2571,14 +2598,17 @@ build_share_link() {
 }
 
 print_node_list_file() {
-  local file="$1" schema
+  local file="$1" schema direct_ip="${2:-}"
   schema="$(jq -r '.schema // 1' "$file")"
+  if (( $# < 2 )) && jq -e 'any(.nodes[]?; .type == "direct")' "$file" >/dev/null; then
+    direct_ip="$(detect_display_direct_ip || true)"
+  fi
   printf '\n%s已配置节点%s\n' "$C_BOLD" "$C_RESET"
   if [[ "$schema" == '2' ]]; then
-    jq -r '
+    jq -r --arg direct_ip "${direct_ip:-未验证}" '
       .inboundPort as $default_port | .nodes[] |
       (if (.type // "socks") == "direct" then
-        "  \(.number)) \(.name)\n     状态：\(if .enabled == false then "已暂停（原链接已保留）" else "已启用" end)\n     出口：VPS 本机直连 · 公网 IPv4：\(.exitIp)"
+        "  \(.number)) \(.name)\n     状态：\(if .enabled == false then "已暂停（原链接已保留）" else "已启用" end)\n     出口：VPS 本机直连 · 公网 IPv4：\($direct_ip)"
       else
         "  \(.number)) \(.name)\n     状态：\(if .enabled == false then "已暂停（原链接已保留）" else "已启用" end)\n     SOCKS5：\(.socksHost):\(.socksPort) · 实际出口：\(if .exitIp == "" then "未验证" else .exitIp end)"
       end) + "\n     入口端口：\(.inboundPort // $default_port)/tcp"
@@ -2645,9 +2675,18 @@ node_enabled() {
 
 show_connection() {
   local selector="${1:-}" footer="${2:-yes}" link node_id outbound_type exit_ip enabled schema
-  local qr_mode="${3:-auto}" display_address="${4:-}"
+  local qr_mode="${3:-auto}" display_address="${4:-}" display_direct_ip="${5:-}" resolved_direct='no'
+  local RESOLVED_SHARE_ADDRESS RESOLVED_DIRECT_IP
   select_node_id "$STATE_FILE" "$selector"
   node_id="$SELECTED_NODE_ID"
+  if [[ -z "$display_address" ]]; then
+    resolve_display_addresses "$STATE_FILE"
+    display_address="$RESOLVED_SHARE_ADDRESS"
+    display_direct_ip="$RESOLVED_DIRECT_IP"
+    resolved_direct='yes'
+  elif (( $# >= 5 )); then
+    resolved_direct='yes'
+  fi
   link="$(build_share_link "$node_id" "$display_address")"
   outbound_type="$(node_outbound_type "$node_id")"
   enabled="$(node_enabled "$node_id")"
@@ -2672,8 +2711,10 @@ show_connection() {
     qrencode -t ANSIUTF8 "$link" || true
   fi
   if [[ "$outbound_type" == 'direct' ]]; then
-    # A changed display address has passed the local/public-IP agreement check.
-    if [[ -n "$display_address" ]] && valid_ipv4 "$display_address" \
+    if [[ "$resolved_direct" == 'yes' ]]; then
+      exit_ip="$display_direct_ip"
+    # Preserve the explicit-address API for callers without an exit-IP context.
+    elif [[ -n "$display_address" ]] && valid_ipv4 "$display_address" \
       && [[ "$display_address" != "$(jq -er '.serverAddress' "$STATE_FILE")" ]]; then
       exit_ip="$display_address"
     fi
@@ -2689,36 +2730,47 @@ show_connection() {
 
 show_all_connections() {
   local schema node_id display_address="${1:-}"
+  local RESOLVED_SHARE_ADDRESS RESOLVED_DIRECT_IP
+  local -a display_context=("$display_address")
+  if [[ -z "$display_address" ]]; then
+    resolve_display_addresses "$STATE_FILE"
+    display_context=("$RESOLVED_SHARE_ADDRESS" "$RESOLVED_DIRECT_IP")
+  elif (( $# >= 2 )); then
+    display_context=("$display_address" "$2")
+  fi
   schema="$(jq -r '.schema // 1' "$STATE_FILE")"
   if [[ "$schema" == '2' ]]; then
     while IFS= read -r node_id; do
-      show_connection "$node_id" no auto "$display_address"
+      show_connection "$node_id" no auto "${display_context[@]}"
     done < <(jq -r '.nodes | sort_by(.number)[] | .id' "$STATE_FILE")
   else
-    show_connection node-1 no auto "$display_address"
+    show_connection node-1 no auto "${display_context[@]}"
   fi
   show_brand_footer
 }
 
 show_connections_by_id() {
-  local node_id
+  local node_id RESOLVED_SHARE_ADDRESS RESOLVED_DIRECT_IP
   (( $# > 0 )) || return 0
+  resolve_display_addresses "$STATE_FILE"
   for node_id in "$@"; do
-    show_connection "$node_id" no
+    show_connection "$node_id" no auto "$RESOLVED_SHARE_ADDRESS" "$RESOLVED_DIRECT_IP"
   done
   show_brand_footer
 }
 
 prepare_connection_preview() (
   local candidate_state="$1" output="$2" qr_mode='no' node_id
+  local RESOLVED_SHARE_ADDRESS RESOLVED_DIRECT_IP
   shift 2
   [[ ! -t 1 ]] || qr_mode='yes'
   # Render before changing installed files; retain the original terminal's QR mode.
   STATE_FILE="$candidate_state"
+  resolve_display_addresses "$STATE_FILE"
   {
     info "节点配置已保存，当前待生效；以下链接将在重启成功后可用。"
     for node_id in "$@"; do
-      show_connection "$node_id" no "$qr_mode"
+      show_connection "$node_id" no "$qr_mode" "$RESOLVED_SHARE_ADDRESS" "$RESOLVED_DIRECT_IP"
     done
     show_brand_footer
     warn "即将重启 PuppyIP 服务；若 SSH 经过这台 VPS 的代理，连接可能中断。" 2>&1
@@ -3006,14 +3058,13 @@ command_list() {
 }
 
 command_show() {
-  local selector="${1:-}" display_address
+  local selector="${1:-}"
   require_root
   [[ -r "$STATE_FILE" ]] || die "PuppyIP Chain 尚未安装。"
-  display_address="$(resolve_share_address)"
   if [[ "$selector" == 'all' || -z "$selector" ]]; then
-    show_all_connections "$display_address"
+    show_all_connections
   else
-    show_connection "$selector" yes auto "$display_address"
+    show_connection "$selector"
   fi
 }
 
@@ -3280,20 +3331,49 @@ status_tcp_port_is_listening() {
       '
 }
 
+socks_probe_error_category() {
+  case "$1" in
+    0) printf '检测站未返回有效 IPv4' ;;
+    5|6) printf 'DNS 解析失败' ;;
+    7) printf '连接失败或被拒绝' ;;
+    28) printf '连接或响应超时' ;;
+    35|51|58|59|60|64|66|77|80|82|83|90|91) printf 'TLS 握手或证书校验失败' ;;
+    67|97) printf '代理握手、认证或上游拒绝' ;;
+    22) printf '检测站返回 HTTP 错误' ;;
+    *) printf '请求失败' ;;
+  esac
+}
+
 probe_ipv4_with_curl_config() {
-  local config_path="$1" endpoint result
+  local config_path="$1" diagnostic_path="${2:-}" endpoint result curl_status attempt=0
   local -a endpoints=(
     'https://api.ipify.org'
     'https://ipv4.icanhazip.com'
     'https://ifconfig.me/ip'
   )
+  if [[ -n "$diagnostic_path" ]]; then
+    : >"$diagnostic_path" || return 1
+    chmod 0600 "$diagnostic_path" || return 1
+  fi
   for endpoint in "${endpoints[@]}"; do
-    result="$(curl --disable --noproxy '' -4 --config "$config_path" \
-      "$endpoint" 2>/dev/null || true)"
-    result="${result//[[:space:]]/}"
-    if valid_ipv4 "$result"; then
+    ((attempt += 1))
+    if result="$(curl --disable --noproxy '' -4 --config "$config_path" \
+      "$endpoint" 2>/dev/null)"; then
+      curl_status=0
+    else
+      curl_status=$?
+    fi
+    result="${result#"${result%%[![:space:]]*}"}"
+    result="${result%"${result##*[![:space:]]}"}"
+    if (( curl_status == 0 )) \
+      && [[ "$result" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ ]] \
+      && valid_ipv4 "$result"; then
       printf '%s' "$result"
       return 0
+    fi
+    if [[ -n "$diagnostic_path" ]]; then
+      printf '  检测点 %s/3：%s（curl 代码 %s）\n' "$attempt" \
+        "$(socks_probe_error_category "$curl_status")" "$curl_status" >>"$diagnostic_path" || return 1
     fi
   done
   return 1

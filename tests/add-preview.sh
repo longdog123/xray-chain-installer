@@ -121,6 +121,11 @@ STATE
   generate_reality_identity() { :; }
   new_temp_dir() { LAST_TEMP_DIR="${case_dir}/work"; }
   curl() { printf 'Unexpected network request\n' >&2; return 99; }
+  ip() {
+    [[ "$*" == '-j -4 address show scope global' ]] || return 99
+    jq '[{addr_info: [{family: "inet", scope: "global", local: .serverAddress}]}]' "$STATE_FILE"
+  }
+  detect_public_ipv4() { printf '%s\n' '203.0.113.10'; }
   ufw() { printf 'Status: active\n'; }
   firewall-cmd() { return 1; }
   collect_panel_reserved_ports() { PANEL_RESERVED_PORTS=(62003); }
