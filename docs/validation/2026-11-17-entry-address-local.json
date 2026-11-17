@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "kind": "entry-address-local-narrow-checks",
+  "runs": [
+    {
+      "phase": "red",
+      "started_at": "2026-11-17T05:53:32.736393+00:00",
+      "completed_at": "2026-11-17T05:53:32.829830+00:00",
+      "source_sha256": "f777a50d9d5b59614e1fb07bf0ea31e62b4e4e5546532277ebd423492a65ed0b",
+      "source_commit": "71343020ec70605f03fd18b3ecf45129758633db",
+      "scope": "Windows Git Bash narrow public command API availability check; no jq, Linux runtime or network used",
+      "exit_code": 1,
+      "failure": "command_address is absent",
+      "expected_failure": true
+    },
+    {
+      "phase": "green-narrow",
+      "started_at": "2026-11-17T06:00:02.836150+00:00",
+      "completed_at": "2026-11-17T06:00:03.206554+00:00",
+      "source_sha256": "3982e04437bc3a44cf9457b0a0ca1d68274574e7356246293613dff3316ee8f2",
+      "test_sha256": "00b0b2b41b14add75354afaa351e609ac758f86e6001e894b734524c5b6d6e27",
+      "exit_code": 0,
+      "checks_passed": 17,
+      "scope": [
+        "13 actual normalize_entry_address acceptance/rejection checks",
+        "4 actual collect_global_settings environment/default checks with network boundary stub"
+      ]
+    }
+  ],
+  "syntax_checks": [
+    "Git Bash bash -n tests/entry-address.sh",
+    "Python ast.parse of embedded fixture"
+  ],
+  "linux_transaction_suite": {
+    "file": "tests/entry-address.sh",
+    "cases": 50,
+    "execution": "Pending GitHub-hosted Linux; not run locally",
+    "test_sha256": "a039836458f9cd1c0cea8d3baea30338e9875f0565eb9424f57f9db8f42dc9b2",
+    "display_extension": {
+      "recorded_at": "2026-11-17T06:08:08.981084+00:00",
+      "new_cases": 13,
+      "syntax_validation": "Bash -n and embedded Python AST passed locally; execution pending hosted Linux.",
+      "scope": [
+        "Real command_show all/single and CLI main show all.",
+        "Standalone show_connection with QR forced or suppressed; show_all_connections and multi-ID/paused output.",
+        "Shared add/port candidate preview in terminal and pipe output.",
+        "command_list and print_node_list_file direct/SOCKS exit display.",
+        "Legacy schema 1 terminal links/QR and auto-address opt-out with saved domain.",
+        "Every displayed full link retains the domain and all other fields; QR inputs equal those links; direct exit remains the independently detected IP."
+      ]
+    }
+  },
+  "cleanup": "No local runtime, network, temporary fixture, state/config or service was created by the narrow shell checks.",
+  "exclusions": [
+    "No complete Linux suite or transaction result is claimed by this report.",
+    "No WSL invocation or reconstruction, live network, VPS, customer state, credentials or service used.",
+    "No complete share links, private paths, raw logs or secrets retained."
+  ]
+}

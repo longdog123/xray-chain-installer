@@ -5,7 +5,7 @@
 set -Eeuo pipefail
 umask 077
 
-SCRIPT_VERSION="0.2.23"
+SCRIPT_VERSION="0.2.24"
 CURRENT_STATE_SCHEMA=2
 SERVICE_NAME="xray-chain.service"
 RUNTIME_USER="xray-chain"
@@ -1078,6 +1078,92 @@ state_value() {
   fi
 }
 
+normalize_entry_address() {
+  local address="${1,,}"
+  if valid_ipv4 "$address"; then
+    printf '%s' "$address"
+    return 0
+  fi
+  address="${address%.}"
+  [[ "$address" == *.* && ! "$address" =~ ^[0-9.]+$ ]] \
+    && valid_domain_name "$address" || return 1
+  printf '%s' "$address"
+}
+
+detect_unique_entry_ipv4() {
+  local local_json addresses address candidate='' detected count=0
+  local_json="$(ip -j -4 address show scope global 2>/dev/null)" || return 1
+  addresses="$(jq -er '
+    if type != "array" then error("invalid address list") else
+      [.[] | .addr_info[]? | select(.family == "inet" and .scope == "global")
+        | .local | select(type == "string")] | unique | .[]
+    end' <<<"$local_json" 2>/dev/null)" || return 1
+  while IFS= read -r address; do
+    if eligible_share_ipv4 "$address"; then
+      candidate="$address"
+      ((count += 1))
+    fi
+  done <<<"$addresses"
+  (( count == 1 )) || return 1
+  detected="$(detect_public_ipv4 2 3 2>/dev/null)" || return 1
+  [[ "$candidate" == "$detected" ]] || return 1
+  printf '%s' "$candidate"
+}
+
+command_address() {
+  local requested="${1:-}" address saved work_dir candidate backup_path
+  (( $# <= 1 )) || die "用法：puppyip address [入口域名|IPv4|auto]；一台 VPS 共用一个入口地址。"
+  require_root
+  [[ -r "$STATE_FILE" && -r "$CONFIG_FILE" ]] \
+    || die "入口地址设置失败：缺少状态或运行配置；请检查 ${STATE_FILE} 和 ${CONFIG_FILE}，勿直接重新安装覆盖线路。"
+  acquire_lock
+  if ! saved="$(jq -er 'select(type == "object") | .serverAddress | select(type == "string" and length > 0)' "$STATE_FILE" 2>/dev/null)"; then
+    die "入口地址设置失败：状态文件无法读取有效 serverAddress；请检查或恢复状态备份，原文件未修改。"
+  fi
+  if (( $# == 0 )); then
+    [[ -t 0 ]] || die "请指定入口地址，例如 puppyip address node.example.com；恢复自动 IP 使用 puppyip address auto。"
+    printf '\n设置本机全部线路的入口域名；端口、凭据和出口保持不变。\n'
+    printf '请将域名的 A 记录解析到 VPS 公网 IPv4（仅 DNS），不要填写 https:// 或端口；无需证书。\n'
+    if ! IFS= read -r -p '入口域名或 IPv4（auto = 自动 IP，回车 = 保留）: ' requested; then
+      die "未读取到入口地址；原设置未修改。"
+    fi
+    [[ -n "$requested" ]] || return 0
+  fi
+  if [[ "$requested" == 'auto' ]]; then
+    address="$(detect_unique_entry_ipv4)" \
+      || die "无法确认唯一的本机公网 IPv4；原入口保留。请检查网络，NAT 或多公网 IP 环境请明确指定入口 IPv4。"
+  else
+    address="$(normalize_entry_address "$requested")" \
+      || die "入口地址格式错误：请填写完整域名或 IPv4，不要包含协议、端口、路径、账号或密码；原设置未修改。"
+  fi
+  if [[ "$address" == "$saved" ]]; then
+    info "入口地址未变化。"
+    return 0
+  fi
+  new_temp_dir
+  work_dir="$LAST_TEMP_DIR"
+  candidate="${work_dir}/entry-state.json"
+  jq --arg address "$address" '.serverAddress = $address' "$STATE_FILE" >"$candidate" \
+    || die "生成入口地址候选状态失败；原状态未修改，请检查磁盘空间。"
+  if ! jq -e --slurpfile before "$STATE_FILE" --arg address "$address" '
+    .serverAddress == $address and (del(.serverAddress) == ($before[0] | del(.serverAddress)))
+  ' "$candidate" >/dev/null; then
+    die "入口地址候选状态改变了其他字段，已停止；原状态未修改。"
+  fi
+  install -d -o root -g root -m 0700 "$BACKUP_DIR" \
+    || die "入口地址备份目录创建失败：${BACKUP_DIR}；请检查权限和磁盘空间，原状态未修改。"
+  backup_path="$(mktemp -d "${BACKUP_DIR}/entry-address.XXXXXXXX")" \
+    || die "入口地址备份创建失败：${BACKUP_DIR}；原状态未修改。"
+  if ! install -o root -g root -m 0600 "$STATE_FILE" "${backup_path}/state.json" \
+    || ! cmp -s -- "$STATE_FILE" "${backup_path}/state.json"; then
+    die "入口地址原状态备份失败，未修改设置；请检查 ${BACKUP_DIR} 权限和磁盘空间。"
+  fi
+  if ! atomic_install "$candidate" "$STATE_FILE" 0600 root root; then
+    die "保存入口地址失败，原状态保留；备份：${backup_path}/state.json。请按上方文件错误处理后重试。"
+  fi
+  info "入口地址已设为 ${address}；输入 puppyip show all 获取链接。"
+}
+
 port_is_listening() {
   local port="$1"
   ss -H -lntu 2>/dev/null \
@@ -1239,8 +1325,13 @@ assert_model_port_available() {
 collect_global_settings() {
   local detected_ip reality_migrated='no'
 
-  detected_ip="$(detect_public_ipv4 || true)"
-  SERVER_ADDRESS="$detected_ip"
+  if [[ -n "${XRAY_CHAIN_ADDRESS:-}" ]]; then
+    SERVER_ADDRESS="$(normalize_entry_address "$XRAY_CHAIN_ADDRESS")" \
+      || die "XRAY_CHAIN_ADDRESS 格式错误：请填写完整入口域名或 IPv4，不要包含协议、端口或凭据。"
+  else
+    detected_ip="$(detect_public_ipv4 || true)"
+    SERVER_ADDRESS="$detected_ip"
+  fi
   if ! valid_ipv4_or_domain "$SERVER_ADDRESS"; then
     prompt_default SERVER_ADDRESS "未能自动识别公网 IPv4，请输入 VPS 公网 IPv4 或域名" ''
   fi
@@ -3923,6 +4014,7 @@ show_menu() {
   printf '  9) 查看运行日志\n'
   printf ' 10) 更新 Xray 程序\n'
   printf ' 11) 卸载 PuppyIP Chain\n'
+  printf ' 12) 设置入口域名 / IP\n'
   printf '  0) 退出\n'
 }
 
@@ -3948,6 +4040,7 @@ usage() {
   sudo puppyip remove [节点编号]       删除节点
   sudo puppyip reset [节点编号]        重置节点凭据
   sudo puppyip port [节点编号]         随机更换指定节点的入口端口
+  sudo puppyip address [域名|IPv4|auto] 设置本机全部线路入口地址（无需证书或重启）
   sudo puppyip upgrade                 原地迁移并更新管理脚本
   sudo puppyip update                  更新 Xray-core 并安全迁移状态
   sudo puppyip status|logs
@@ -3960,6 +4053,7 @@ usage() {
   XRAY_CHAIN_REALITY_TARGET=域名:443 自定义 REALITY 目标
   XRAY_CHAIN_REALITY_SNI=域名        自定义 REALITY SNI；默认与目标域名一致
   XRAY_CHAIN_PORT=62001              指定首次安装的首节点端口；其余节点自动选择高位端口
+  XRAY_CHAIN_ADDRESS=入口域名        首次安装使用域名或 IPv4；已有安装请用 puppyip address
   XRAY_CHAIN_UDP_MODE=block|proxy     新节点 UDP 策略；默认 proxy
   XRAY_CHAIN_ENABLE_BBR=1|0           自动启用 BBR；默认 1，设为 0 时不修改 TCP 参数
   XRAY_CHAIN_AUTO_ADDRESS=1|0         查看时自动使用当前本机公网 IP；固定数字中转入口设为 0
@@ -3978,7 +4072,7 @@ run_management_menu() {
   local command
   while true; do
     show_menu
-    if ! read -r -p '请选择要做的操作 [0-11]: ' command; then
+    if ! read -r -p '请选择要做的操作 [0-12]: ' command; then
       printf '\n'
       exit 0
     fi
@@ -3997,6 +4091,7 @@ run_management_menu() {
         command_uninstall
         if installation_complete; then pause_menu; else exit 0; fi
         ;;
+      12) command_address; pause_menu ;;
       0) exit 0 ;;
       *) warn "无效选项。" ;;
     esac
@@ -4021,6 +4116,7 @@ main() {
     install) command_install ;;
     add) command_add ;;
     port) shift; command_port "$@" ;;
+    address) shift; command_address "$@" ;;
     list) command_list ;;
     show) shift; command_show "${1:-}" ;;
     edit|reconfigure) shift; command_edit "${1:-}" ;;
