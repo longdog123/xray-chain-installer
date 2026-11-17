@@ -7,6 +7,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 run_worker() {
   local scenario="$1" case_dir="$2" value="$3" status=0 node_id display_output
+  # shellcheck source=../install.sh
   source "${ENTRY_ADDRESS_SCRIPT:-${ROOT_DIR}/install.sh}"
   STATE_FILE="${case_dir}/state.json"
   CONFIG_FILE="${case_dir}/config.json"
@@ -22,18 +23,27 @@ run_worker() {
   PRIVATE_KEY='fixture-private-key'
   unset XRAY_CHAIN_ADDRESS XRAY_CHAIN_AUTO_ADDRESS XRAY_CHAIN_PORT
   [[ "$scenario" != 'display-disabled-all-pipe' ]] || export XRAY_CHAIN_AUTO_ADDRESS=0
+  # These boundary functions are called indirectly by the sourced production code.
+  # shellcheck disable=SC2317
   require_root() { :; }
+  # shellcheck disable=SC2317
   systemctl() { printf 'service\n' >>"${case_dir}/forbidden"; return 99; }
+  # shellcheck disable=SC2317
   confirm_continue() { printf 'confirmation\n' >>"${case_dir}/forbidden"; return 99; }
+  # shellcheck disable=SC2317
   getent() { printf 'dns\n' >>"${case_dir}/forbidden"; return 99; }
+  # shellcheck disable=SC2317
   dig() { printf 'dns\n' >>"${case_dir}/forbidden"; return 99; }
+  # shellcheck disable=SC2317
   host() { printf 'dns\n' >>"${case_dir}/forbidden"; return 99; }
+  # shellcheck disable=SC2317
   ip() {
     printf '%s\n' "$*" >>"${case_dir}/ip-calls"
     [[ "$*" == '-j -4 address show scope global' ]] || return 99
     [[ "$scenario" != 'auto-ip-failure' ]] || return 1
     cat -- "${case_dir}/local-addresses.json"
   }
+  # shellcheck disable=SC2317
   curl() {
     printf '%s\n' "${!#}" >>"${case_dir}/curl-calls"
     case "${!#}" in
@@ -43,7 +53,29 @@ run_worker() {
     cat -- "${case_dir}/public-address"
     [[ "$scenario" != 'auto-probe-failure' ]]
   }
+  jq() {
+    local argument candidate_generation='no'
+    for argument in "$@"; do
+      # Match the literal jq program, whose $address is a jq variable.
+      # shellcheck disable=SC2016
+      [[ "$argument" != '.serverAddress = $address' ]] || candidate_generation='yes'
+    done
+    if [[ "$scenario" == 'precision-loss' && "$candidate_generation" == 'yes' ]]; then
+      command jq "$@" | python3 -c '
+import pathlib, re, sys
+raw = sys.stdin.buffer.read()
+changed, count = re.subn(rb"(\"externalId\"\s*:\s*)9007199254740993(?![0-9])",
+                         rb"\g<1>9007199254740992", raw, count=1)
+assert count == 1, "precision injection target missing"
+pathlib.Path(sys.argv[1]).write_text("candidate-only\n")
+sys.stdout.buffer.write(changed)
+' "${case_dir}/precision-injected"
+    else
+      command jq "$@"
+    fi
+  }
   # Preserve the actual atomic implementation; only adapt ownership for hosted non-root runners.
+  # shellcheck disable=SC2317
   install() {
     local owner='' group='' mode='' destination="${!#}" argument directory='no'
     local -a arguments=()
@@ -69,6 +101,7 @@ run_worker() {
     fi
     command install "${arguments[@]}"
   }
+  # shellcheck disable=SC2317
   mv() {
     if [[ "${!#}" == "$STATE_FILE" ]]; then
       printf 'replace\n' >>"${case_dir}/replacements"
@@ -76,11 +109,15 @@ run_worker() {
     fi
     command mv "$@"
   }
+  # shellcheck disable=SC2317
   qrencode() { printf '%s\n' "$3" >>"${case_dir}/qr-links"; }
+  # shellcheck disable=SC2317
   generate_reality_identity() { PUBLIC_KEY='fixture-public-key'; }
+  # shellcheck disable=SC2317
   generate_unique_node_identity() {
     UUID='ffffffff-ffff-4fff-8fff-ffffffffffff'; SHORT_ID='ffffffffffffffff'; SPIDER_X='/new-fixture';
   }
+  # shellcheck disable=SC2317
   select_inbound_port() { INBOUND_PORT=63000; }
   mkdir -p "$BACKUP_DIR" "${case_dir}/model-work"
 
@@ -172,6 +209,7 @@ cases = [(name, "Entry.Example.COM.") for name in
 cases += [("ipv4", "203.0.113.30"), ("same", "Entry.Example.COM."), ("empty-tty", ""),
           ("domain-tty", "Entry.Example.COM."), ("no-argument", ""), ("empty-argument", ""),
           ("extra-argument", domain), ("backup-failure", domain), ("atomic-failure", domain), ("lock-busy", domain)]
+cases += [("large-number", domain), ("precision-loss", domain)]
 cases += [(name, "auto") for name in ("auto", "auto-ambiguous", "auto-nat", "auto-private", "auto-ip-failure", "auto-probe-failure")]
 cases += [("malformed-" + str(index), value) for index, value in enumerate([
     "https://fixture-user:fixture-password@entry.example.com", "entry.example.com:443", "localhost",
@@ -217,6 +255,14 @@ def fixture(folder, scenario):
                  realityPublicKey="fixture-public-key", installedAt="2026-01-01T00:00:00Z",
                  updatedAt="2026-01-02T00:00:00Z", installerVersion="fixture", xrayVersion="v26.3.27",
                  nextNodeNumber=count+1, nodes=nodes, unknownTopLevel={"nested": [1, None, "preserve"]})
+    if scenario in {"large-number", "precision-loss"}:
+        # Python ints preserve the source lexemes exactly; no binary float round-trip.
+        state["externalId"] = 9007199254740993
+        state["unknownTopLevel"]["precision"] = {
+            "externalId": 123456789012345678901234567891,
+            "nested": [9007199254740995, -9007199254740993],
+            "text": '9007199254740993 1.2300e+21 "123"',
+        }
     if scenario in {"schema1", "display-legacy-all-tty"}:
         state = {key: value for key, value in state.items() if key not in {"nodes", "nextNodeNumber", "realityPublicKey"}}
         state.update(schema=1, publicKey="fixture-public-key", uuid=nodes[0]["uuid"], shortId=nodes[0]["shortId"],
@@ -287,7 +333,7 @@ with tempfile.TemporaryDirectory(prefix="puppyip-entry-address.") as directory:
             require(process.returncode == 0, "fixture worker failed outside the address operation")
             status = int((folder / "status").read_text())
             output = ((folder / "display").read_text() if (folder / "display").exists() else "") + (stdout + stderr).decode()
-            failure = scenario.startswith("malformed-") or scenario in {"no-argument", "empty-argument", "extra-argument", "backup-failure", "atomic-failure", "lock-busy", "auto-ambiguous", "auto-nat", "auto-private", "auto-ip-failure", "auto-probe-failure", "initial-invalid"}
+            failure = scenario.startswith("malformed-") or scenario in {"no-argument", "empty-argument", "extra-argument", "backup-failure", "atomic-failure", "lock-busy", "precision-loss", "auto-ambiguous", "auto-nat", "auto-private", "auto-ip-failure", "auto-probe-failure", "initial-invalid"}
             require((status != 0) == failure, "address operation success/failure differs from the contract")
             require(not any(secret in output for secret in ("fixture-password", "fixture-user", "fixture-private-key")), "error output exposed credentials or private material")
             require(not (folder / "forbidden").exists(), "address operation invoked DNS, core, service, confirmation or wrong ownership")
@@ -306,6 +352,16 @@ with tempfile.TemporaryDirectory(prefix="puppyip-entry-address.") as directory:
                 require(json.loads((folder / "state.json").read_text()) == expected, "state changed beyond serverAddress (including unknown fields, metadata or schema)")
                 if unchanged:
                     require((folder / "state.json").read_bytes() == before, "failed/no-op address operation rewrote the original state")
+                if scenario == "precision-loss":
+                    require(lines(folder / "precision-injected") == ["candidate-only"], "candidate-only precision fault was not injected")
+                    require("数字" in output and "原状态" in output, "precision loss was not rejected with its specific safe diagnostic")
+                    require(not lines(folder / "install-calls") and not lines(folder / "replacements"),
+                            "precision loss was detected only after backup or state-write operations")
+                if scenario == "large-number":
+                    saved_text = (folder / "state.json").read_text()
+                    require('"externalId": 9007199254740993' in saved_text and
+                            '"externalId": 123456789012345678901234567891' in saved_text,
+                            "large unknown integers were rounded or converted to exponent notation")
                 require((folder / "config.json").read_bytes() == (folder / "before-config.json").read_bytes(), "address operation rewrote runtime config")
                 old_links = lines(folder / "before-links"); new_links = lines(folder / "after-links")
                 require(len(new_links) == len(old_links), "address operation changed the node count")

@@ -82,6 +82,8 @@ run_failure_case() (
   write_value "${work_dir}/xray-chain.service" 'new-service'
   write_value "${work_dir}/manager" 'new-manager'
 
+  # Called indirectly by the sourced installer or its exported fixture hooks.
+  # shellcheck disable=SC2317
   should_fail_once() {
     local point="$1"
     [[ "$fail_point" == "$point" && ! -e "$FAILURE_MARKER" ]] || return 1
@@ -89,6 +91,8 @@ run_failure_case() (
     return 0
   }
 
+  # Called indirectly by the sourced installer or its exported fixture hooks.
+  # shellcheck disable=SC2317
   backup_copy_if_present() {
     local source="$1" destination="$2"
     if [[ "$fail_point" == 'backup-state' && "$source" == "$STATE_FILE" ]]; then
@@ -99,6 +103,8 @@ run_failure_case() (
     fi
   }
 
+  # Called indirectly by the sourced installer or its exported fixture hooks.
+  # shellcheck disable=SC2317
   atomic_install() {
     local source="$1" destination="$2"
     if [[ "$destination" == "$STATE_FILE" ]] && should_fail_once 'state-install'; then
@@ -111,6 +117,8 @@ run_failure_case() (
     cp -- "$source" "$destination"
   }
 
+  # Called indirectly by the sourced installer or its exported fixture hooks.
+  # shellcheck disable=SC2317
   systemctl() {
     local command="${1:-}"
     case "$command" in
@@ -149,9 +157,17 @@ run_failure_case() (
     esac
   }
 
+  # Called indirectly by the sourced installer or its exported fixture hooks.
+  # shellcheck disable=SC2317
   journalctl() { :; }
+  # Called indirectly by the sourced installer or its exported fixture hooks.
+  # shellcheck disable=SC2317
   sleep() { :; }
+  # Called indirectly by the sourced installer or its exported fixture hooks.
+  # shellcheck disable=SC2317
   cleanup_runtime_layout_created_this_run() { :; }
+  # Called indirectly by the sourced installer or its exported fixture hooks.
+  # shellcheck disable=SC2317
   commit_runtime_layout() { :; }
 
   set +e

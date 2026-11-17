@@ -27,7 +27,7 @@ run_worker() {
   RUNTIME_GROUP="$(id -gn)"
   mkdir -p "$BIN_DIR" "$ASSET_DIR" "$CONFIG_DIR" "$BACKUP_DIR" "${case_dir}/work"
 
-  cat >"$XRAY_BIN" <<'XRAY'
+  command cat >"$XRAY_BIN" <<'XRAY'
 #!/usr/bin/env bash
 set -Eeuo pipefail
 [[ "$*" == 'run -test -c '* ]] || exit 99
@@ -41,7 +41,7 @@ XRAY
   printf 'fixture-service\n' >"$SERVICE_FILE"
   printf 'old-manager\n' >"$MANAGER_BIN"
   printf 'old-legacy-manager\n' >"$LEGACY_MANAGER_BIN"
-  cat >"$STATE_FILE" <<'STATE'
+  command cat >"$STATE_FILE" <<'STATE'
 {
   "schema": 2,
   "installedAt": "2026-01-01T00:00:00Z",
@@ -103,33 +103,69 @@ STATE
   cp -- "$CONFIG_FILE" "${case_dir}/old-config.json"
 
   # Boundaries requiring root, a live host, randomness, or operator input.
+  # Called indirectly by the sourced installer or its exported fixture hooks.
+  # shellcheck disable=SC2317
   require_root() { :; }
+  # Called indirectly by the sourced installer or its exported fixture hooks.
+  # shellcheck disable=SC2317
   check_platform() { :; }
+  # Called indirectly by the sourced installer or its exported fixture hooks.
+  # shellcheck disable=SC2317
   require_systemd() { :; }
+  # Called indirectly by the sourced installer or its exported fixture hooks.
+  # shellcheck disable=SC2317
   acquire_lock() { :; }
+  # Called indirectly by the sourced installer or its exported fixture hooks.
+  # shellcheck disable=SC2317
   refresh_brand_banner() { :; }
   if [[ "$scenario" != port-* ]]; then
+    # Called indirectly by the sourced installer or its exported fixture hooks.
+    # shellcheck disable=SC2317
     assert_model_port_available() { :; }
   fi
+  # Called indirectly by the sourced installer or its exported fixture hooks.
+  # shellcheck disable=SC2317
   ensure_runtime_layout() { :; }
+  # Called indirectly by the sourced installer or its exported fixture hooks.
+  # shellcheck disable=SC2317
   cleanup_runtime_layout_created_this_run() { :; }
+  # Called indirectly by the sourced installer or its exported fixture hooks.
+  # shellcheck disable=SC2317
   sleep() {
     if [[ ( "$scenario" == 'preview-interrupt' || "$scenario" == 'port-interrupt' ) && "$1" == '2' ]]; then
       kill -INT "$$"
     fi
   }
+  # Called indirectly by the sourced installer or its exported fixture hooks.
+  # shellcheck disable=SC2317
   generate_reality_identity() { :; }
+  # Called indirectly by the sourced installer or its exported fixture hooks.
+  # shellcheck disable=SC2317
   new_temp_dir() { LAST_TEMP_DIR="${case_dir}/work"; }
+  # Called indirectly by the sourced installer or its exported fixture hooks.
+  # shellcheck disable=SC2317
   curl() { printf 'Unexpected network request\n' >&2; return 99; }
+  # Called indirectly by the sourced installer or its exported fixture hooks.
+  # shellcheck disable=SC2317
   ip() {
     [[ "$*" == '-j -4 address show scope global' ]] || return 99
     jq '[{addr_info: [{family: "inet", scope: "global", local: .serverAddress}]}]' "$STATE_FILE"
   }
+  # Called indirectly by the sourced installer or its exported fixture hooks.
+  # shellcheck disable=SC2317
   detect_public_ipv4() { printf '%s\n' '203.0.113.10'; }
+  # Called indirectly by the sourced installer or its exported fixture hooks.
+  # shellcheck disable=SC2317
   ufw() { printf 'Status: active\n'; }
+  # Called indirectly by the sourced installer or its exported fixture hooks.
+  # shellcheck disable=SC2317
   firewall-cmd() { return 1; }
+  # Called indirectly by the sourced installer or its exported fixture hooks.
+  # shellcheck disable=SC2317
   collect_panel_reserved_ports() { PANEL_RESERVED_PORTS=(62003); }
   PORT_CANDIDATE_CALLS=0
+  # Called indirectly by the sourced installer or its exported fixture hooks.
+  # shellcheck disable=SC2317
   generate_auto_port_candidate() {
     local -a candidates=(62002 443 62003 62004 62005 62006)
     case "$scenario" in
@@ -144,6 +180,8 @@ STATE
       AUTO_PORT_CANDIDATE="${candidates[$(((PORT_CANDIDATE_CALLS - 1) % ${#candidates[@]}))]}"
     fi
   }
+  # Called indirectly by the sourced installer or its exported fixture hooks.
+  # shellcheck disable=SC2317
   ss() {
     printf '%s\n' 'tcp LISTEN 0 128 0.0.0.0:62004 0.0.0.0:*' \
       'udp UNCONN 0 0 [::]:62005 [::]:*'
@@ -151,6 +189,8 @@ STATE
       printf '%s\n' 'tcp LISTEN 0 128 0.0.0.0:62006 0.0.0.0:*'
     fi
   }
+  # Called indirectly by the sourced installer or its exported fixture hooks.
+  # shellcheck disable=SC2317
   collect_socks_batch_settings() {
     if [[ "$scenario" == 'direct' ]]; then
       ADD_DIRECT_NODE='yes'
@@ -163,6 +203,8 @@ STATE
       )
     fi
   }
+  # Called indirectly by the sourced installer or its exported fixture hooks.
+  # shellcheck disable=SC2317
   collect_socks_settings() {
     NODE_TYPE='socks'
     SOCKS_HOST='198.51.100.2'
@@ -171,9 +213,17 @@ STATE
     SOCKS_PASS='fixture-edit-password'
     SOCKS_INPUT_CHANGED='yes'
   }
+  # Called indirectly by the sourced installer or its exported fixture hooks.
+  # shellcheck disable=SC2317
   prompt_yes_no() { printf -v "$1" '%s' "$3"; }
+  # Called indirectly by the sourced installer or its exported fixture hooks.
+  # shellcheck disable=SC2317
   verify_socks_proxy() { SOCKS_EXIT_IP="$SOCKS_HOST"; }
+  # Called indirectly by the sourced installer or its exported fixture hooks.
+  # shellcheck disable=SC2317
   verify_direct_outbound() { SOCKS_EXIT_IP='203.0.113.10'; }
+  # Called indirectly by the sourced installer or its exported fixture hooks.
+  # shellcheck disable=SC2317
   generate_node_identity() {
     local number
     number="$(jq -r '.nextNodeNumber' "$MODEL_FILE")"
@@ -181,6 +231,8 @@ STATE
     printf -v SHORT_ID '%016d' "$number"
     SPIDER_X="/${SHORT_ID}"
   }
+  # Called indirectly by the sourced installer or its exported fixture hooks.
+  # shellcheck disable=SC2317
   qrencode() {
     [[ "$1" == '-t' && "$2" == 'ANSIUTF8' && "$3" == vless://* ]]
     [[ "$scenario" != 'qr-error' ]] || return 1
@@ -188,8 +240,12 @@ STATE
     printf '__QR__:%s\n' "${identity%%@*}"
   }
   if [[ "$scenario" == 'preview-render-failure' ]]; then
+    # Called indirectly by the sourced installer or its exported fixture hooks.
+    # shellcheck disable=SC2317
     show_connection() { return 1; }
   fi
+  # The sourced deploy function calls this mock with its preview filename.
+  # shellcheck disable=SC2317,SC2120
   cat() {
     if [[ "$scenario" == 'preview-output-failure' && "${!#}" == */new-connections.txt ]]; then
       printf '__PREVIEW_OUTPUT_FAILED__\n' >&3
@@ -200,6 +256,8 @@ STATE
 
   # Retain atomic_install itself; remove ownership requirements at the OS edge
   # and inject failures in the real transaction's install(1) operation.
+  # Called indirectly by the sourced installer or its exported fixture hooks.
+  # shellcheck disable=SC2317
   install() {
     local argument destination="${!#}" failure_destination=''
     local -a arguments=()
@@ -228,6 +286,8 @@ STATE
       printf '__FILES_WRITTEN__\n' >&3
     fi
   }
+  # Called indirectly by the sourced installer or its exported fixture hooks.
+  # shellcheck disable=SC2317
   systemctl() {
     case "${1:-}" in
       restart)
@@ -258,10 +318,18 @@ STATE
       XRAY_CHAIN_PORT='62099'
       case "$scenario" in
         port-menu)
+          # Called indirectly by the sourced installer or its exported fixture hooks.
+          # shellcheck disable=SC2317
           installation_complete() { return 0; }
+          # Called indirectly by the sourced installer or its exported fixture hooks.
+          # shellcheck disable=SC2317
           running_as_installed_manager() { return 0; }
           # Update policy has its own suite; keep this test on the port menu flow.
+          # Called indirectly by the sourced installer or its exported fixture hooks.
+          # shellcheck disable=SC2317
           maybe_update_manager() { :; }
+          # Called indirectly by the sourced installer or its exported fixture hooks.
+          # shellcheck disable=SC2317
           show_brand_banner() { :; }
           (main)
           ;;

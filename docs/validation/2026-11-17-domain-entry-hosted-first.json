@@ -1,0 +1,935 @@
+{
+  "schema": 1,
+  "kind": "github_hosted_linux_regressions",
+  "status": "failed",
+  "started_at_utc": "2026-11-17T06:09:21.393837+00:00",
+  "source_sha": "96388667a70b72aec031ab135605eb16216002fb",
+  "workflow_sha": "96388667a70b72aec031ab135605eb16216002fb",
+  "workflow_file_sha256": "9fa9716f7180f5e1325504f5caf4c8ddb68c2dfcd9eb5f5bb38887bc990ca0ed",
+  "run_id": "44029099268",
+  "run_attempt": "1",
+  "repository": "longdog123/xray-chain-installer",
+  "ref": "refs/heads/codex/domain-entry-address",
+  "file_sha256": {
+    "install.sh": "3982e04437bc3a44cf9457b0a0ca1d68274574e7356246293613dff3316ee8f2",
+    ".github/workflows/tests.yml": "9fa9716f7180f5e1325504f5caf4c8ddb68c2dfcd9eb5f5bb38887bc990ca0ed",
+    "tests/add-preview.sh": "cb11fa9c8c812c1602a4254ab2efdd005d9639cb458bf9c0e488f417d17ba34a",
+    "tests/address-refresh.sh": "420e2ca0368d457b8fed12a14d57eda90751e40cede90bf8b877f1692b0d78e4",
+    "tests/auto-update.sh": "23cdbaf20a4ad10761c03dc1a7a02aeb6efe49b49e7669c95bb3420fa679d6d2",
+    "tests/entry-address.sh": "a039836458f9cd1c0cea8d3baea30338e9875f0565eb9424f57f9db8f42dc9b2",
+    "tests/error-context.sh": "b81201322f6b104e17ad7468e0ba590a29efb208c5268296869fe2c923143093",
+    "tests/integration.sh": "8ab89bc9778efa9402bdf43fa956b7e70b3c4a377fd433b6d4ade25f2beab697",
+    "tests/port-change.sh": "3aabe799e1d7c8239aaac4be1a3d05027a80d87036a41adafb2f026ba4fa0ca9",
+    "tests/preflight.sh": "6e07f3ca04956161c90c83243f8bba5d2f98cd6a13d45c9a99301af7245e46e4",
+    "tests/rollback.sh": "a76d3dd8508f2b97ea4b22994e88de758de80c7a07a1a03351a2b5f4fde6c5e0",
+    "tests/socks-verification.sh": "817b27d979b71717c3347a6cdc20fae7cde337e4ab5eaffb32bec8cfc327800d",
+    "tests/static.sh": "875d19371936bec1b3bea25aa416ba5244c7643da7ee9644d5c7781e8ac65a76",
+    "tests/status-errors.sh": "b172d3dfeb0db4c5557dfd321cee8120e12707b376dcff53eb3477cac813a542",
+    "tests/system-errors.sh": "07b603546e3b856c1bd726707479c98d10746e19ce2320f6ced0e4df6fda8cf0",
+    "tests/ci.py": "814f07d6f56910a561bce28a5d953526f7689650c577cc2e0585445c0c23a316",
+    "tests/ci_unit.py": "9f34f9ac065018fd2e28cf311e00c59b3f9f084f0ecdd878790db0ca8450ba27"
+  },
+  "timing_clock": "monotonic; UTC timestamps recorded separately",
+  "environment": {
+    "os": "ubuntu-24.04",
+    "architecture": "x86_64",
+    "root_for_fixture_ownership": true,
+    "per_suite_network": "isolated",
+    "package_versions": {
+      "bash": "5.2.21-2ubuntu4",
+      "ca-certificates": "20260816ubuntu0.24.04.2",
+      "coreutils": "9.4-3ubuntu6.3",
+      "curl": "8.5.0-2ubuntu10.16",
+      "diffutils": "1:3.10-1ubuntu0.1",
+      "findutils": "4.9.0-5build1",
+      "gawk": "1:5.2.1-2ubuntu0.1",
+      "git": "1:2.56.1-0ppa1~ubuntu24.04.1",
+      "grep": "3.11-4build1",
+      "iproute2": "6.1.0-1ubuntu6.4",
+      "jq": "1.7.1-3ubuntu0.24.04.2",
+      "kmod": "31+20240202-2ubuntu7.2",
+      "openssl": "3.0.13-0ubuntu3.16",
+      "passwd": "1:4.13+dfsg1-4ubuntu3.2",
+      "procps": "2:4.0.4-4ubuntu3.3",
+      "python3": "3.12.3-0ubuntu2.1",
+      "sed": "4.9-2ubuntu0.24.04.1",
+      "shellcheck": "0.9.0-1",
+      "sqlite3": "3.45.1-1ubuntu2.9",
+      "unzip": "6.0-28ubuntu4.1",
+      "util-linux": "2.39.3-9ubuntu6.6"
+    }
+  },
+  "stages": [
+    {
+      "stage": "package_index",
+      "exit_code": 0,
+      "elapsed_seconds": 4.926
+    },
+    {
+      "stage": "test_dependencies",
+      "exit_code": 0,
+      "elapsed_seconds": 0.415
+    },
+    {
+      "stage": "runner_unit_tests",
+      "exit_code": 0,
+      "elapsed_seconds": 0.214
+    }
+  ],
+  "results": [
+    {
+      "suite": "tests/integration.sh",
+      "started_at_utc": "2026-11-17T06:09:27.944194+00:00",
+      "completed_at_utc": "2026-11-17T06:09:30.819068+00:00",
+      "elapsed_seconds": 2.875,
+      "exit_code": 0,
+      "status": "passed",
+      "diagnostics": {
+        "scenario_counts": {
+          "passed": 0,
+          "failed": 0
+        },
+        "failed_scenarios": [],
+        "shellcheck": [],
+        "source_locations": [],
+        "category_counts": {},
+        "rejected_scenario_count": 0,
+        "truncated": false
+      },
+      "temporary_entries_before_namespace_release": 0,
+      "isolation_started_at_utc": "2026-11-17T06:09:27.880547+00:00",
+      "isolation_completed_at_utc": "2026-11-17T06:09:30.860323+00:00",
+      "isolation_elapsed_seconds": 2.98,
+      "namespace_process_exit_observed": true
+    },
+    {
+      "suite": "tests/add-preview.sh",
+      "started_at_utc": "2026-11-17T06:09:30.906003+00:00",
+      "completed_at_utc": "2026-11-17T06:09:40.843166+00:00",
+      "elapsed_seconds": 9.937,
+      "exit_code": 0,
+      "status": "passed",
+      "diagnostics": {
+        "scenario_counts": {
+          "passed": 29,
+          "failed": 0
+        },
+        "failed_scenarios": [],
+        "shellcheck": [],
+        "source_locations": [],
+        "category_counts": {},
+        "rejected_scenario_count": 0,
+        "truncated": false
+      },
+      "temporary_entries_before_namespace_release": 0,
+      "isolation_started_at_utc": "2026-11-17T06:09:30.861480+00:00",
+      "isolation_completed_at_utc": "2026-11-17T06:09:40.892974+00:00",
+      "isolation_elapsed_seconds": 10.031,
+      "namespace_process_exit_observed": true
+    },
+    {
+      "suite": "tests/port-change.sh",
+      "started_at_utc": "2026-11-17T06:09:40.938296+00:00",
+      "completed_at_utc": "2026-11-17T06:09:41.007155+00:00",
+      "elapsed_seconds": 0.069,
+      "exit_code": 0,
+      "status": "passed",
+      "diagnostics": {
+        "scenario_counts": {
+          "passed": 5,
+          "failed": 0
+        },
+        "failed_scenarios": [],
+        "shellcheck": [],
+        "source_locations": [],
+        "category_counts": {},
+        "rejected_scenario_count": 0,
+        "truncated": false
+      },
+      "temporary_entries_before_namespace_release": 0,
+      "isolation_started_at_utc": "2026-11-17T06:09:40.893839+00:00",
+      "isolation_completed_at_utc": "2026-11-17T06:09:41.058034+00:00",
+      "isolation_elapsed_seconds": 0.164,
+      "namespace_process_exit_observed": true
+    },
+    {
+      "suite": "tests/rollback.sh",
+      "started_at_utc": "2026-11-17T06:09:41.103381+00:00",
+      "completed_at_utc": "2026-11-17T06:09:41.623233+00:00",
+      "elapsed_seconds": 0.52,
+      "exit_code": 0,
+      "status": "passed",
+      "diagnostics": {
+        "scenario_counts": {
+          "passed": 0,
+          "failed": 0
+        },
+        "failed_scenarios": [],
+        "shellcheck": [],
+        "source_locations": [],
+        "category_counts": {},
+        "rejected_scenario_count": 0,
+        "truncated": false
+      },
+      "temporary_entries_before_namespace_release": 0,
+      "isolation_started_at_utc": "2026-11-17T06:09:41.058905+00:00",
+      "isolation_completed_at_utc": "2026-11-17T06:09:41.673901+00:00",
+      "isolation_elapsed_seconds": 0.615,
+      "namespace_process_exit_observed": true
+    },
+    {
+      "suite": "tests/auto-update.sh",
+      "started_at_utc": "2026-11-17T06:09:41.718717+00:00",
+      "completed_at_utc": "2026-11-17T06:09:44.693108+00:00",
+      "elapsed_seconds": 2.974,
+      "exit_code": 0,
+      "status": "passed",
+      "diagnostics": {
+        "scenario_counts": {
+          "passed": 35,
+          "failed": 0
+        },
+        "failed_scenarios": [],
+        "shellcheck": [],
+        "source_locations": [],
+        "category_counts": {},
+        "rejected_scenario_count": 0,
+        "truncated": false
+      },
+      "temporary_entries_before_namespace_release": 0,
+      "isolation_started_at_utc": "2026-11-17T06:09:41.674721+00:00",
+      "isolation_completed_at_utc": "2026-11-17T06:09:44.744032+00:00",
+      "isolation_elapsed_seconds": 3.069,
+      "namespace_process_exit_observed": true
+    },
+    {
+      "suite": "tests/static.sh",
+      "started_at_utc": "2026-11-17T06:09:44.792164+00:00",
+      "completed_at_utc": "2026-11-17T06:09:52.939511+00:00",
+      "elapsed_seconds": 8.147,
+      "exit_code": 1,
+      "status": "failed",
+      "diagnostics": {
+        "scenario_counts": {
+          "passed": 0,
+          "failed": 0
+        },
+        "failed_scenarios": [],
+        "shellcheck": [
+          {
+            "source": "install.sh",
+            "line": 674,
+            "code": "SC2034"
+          },
+          {
+            "source": "install.sh",
+            "line": 1001,
+            "code": "SC2034"
+          },
+          {
+            "source": "install.sh",
+            "line": 2004,
+            "code": "SC1111"
+          },
+          {
+            "source": "install.sh",
+            "line": 2955,
+            "code": "SC2120"
+          },
+          {
+            "source": "install.sh",
+            "line": 2992,
+            "code": "SC2030"
+          },
+          {
+            "source": "install.sh",
+            "line": 3007,
+            "code": "SC2190"
+          },
+          {
+            "source": "install.sh",
+            "line": 3009,
+            "code": "SC2031"
+          },
+          {
+            "source": "install.sh",
+            "line": 3010,
+            "code": "SC2031"
+          },
+          {
+            "source": "install.sh",
+            "line": 3138,
+            "code": "SC2031"
+          },
+          {
+            "source": "install.sh",
+            "line": 3142,
+            "code": "SC2031"
+          },
+          {
+            "source": "install.sh",
+            "line": 3242,
+            "code": "SC2031"
+          },
+          {
+            "source": "install.sh",
+            "line": 3290,
+            "code": "SC2031"
+          },
+          {
+            "source": "install.sh",
+            "line": 3297,
+            "code": "SC2031"
+          },
+          {
+            "source": "install.sh",
+            "line": 3298,
+            "code": "SC2031"
+          },
+          {
+            "source": "install.sh",
+            "line": 3304,
+            "code": "SC2031"
+          },
+          {
+            "source": "install.sh",
+            "line": 3306,
+            "code": "SC2119"
+          },
+          {
+            "source": "install.sh",
+            "line": 3384,
+            "code": "SC2031"
+          },
+          {
+            "source": "install.sh",
+            "line": 3458,
+            "code": "SC2031"
+          },
+          {
+            "source": "install.sh",
+            "line": 3469,
+            "code": "SC2120"
+          },
+          {
+            "source": "install.sh",
+            "line": 3494,
+            "code": "SC2031"
+          },
+          {
+            "source": "install.sh",
+            "line": 3548,
+            "code": "SC2031"
+          },
+          {
+            "source": "install.sh",
+            "line": 3556,
+            "code": "SC2031"
+          },
+          {
+            "source": "install.sh",
+            "line": 3709,
+            "code": "SC2031"
+          },
+          {
+            "source": "install.sh",
+            "line": 3712,
+            "code": "SC2031"
+          },
+          {
+            "source": "install.sh",
+            "line": 3714,
+            "code": "SC2031"
+          },
+          {
+            "source": "install.sh",
+            "line": 3716,
+            "code": "SC2031"
+          },
+          {
+            "source": "install.sh",
+            "line": 3719,
+            "code": "SC2031"
+          },
+          {
+            "source": "install.sh",
+            "line": 3721,
+            "code": "SC2031"
+          },
+          {
+            "source": "install.sh",
+            "line": 3723,
+            "code": "SC2031"
+          },
+          {
+            "source": "install.sh",
+            "line": 3728,
+            "code": "SC2031"
+          },
+          {
+            "source": "install.sh",
+            "line": 3732,
+            "code": "SC2031"
+          },
+          {
+            "source": "install.sh",
+            "line": 3838,
+            "code": "SC2031"
+          },
+          {
+            "source": "install.sh",
+            "line": 3839,
+            "code": "SC2031"
+          },
+          {
+            "source": "install.sh",
+            "line": 3850,
+            "code": "SC2031"
+          },
+          {
+            "source": "install.sh",
+            "line": 3851,
+            "code": "SC2031"
+          },
+          {
+            "source": "install.sh",
+            "line": 3853,
+            "code": "SC2031"
+          },
+          {
+            "source": "install.sh",
+            "line": 3855,
+            "code": "SC2031"
+          },
+          {
+            "source": "install.sh",
+            "line": 3856,
+            "code": "SC2031"
+          },
+          {
+            "source": "install.sh",
+            "line": 3862,
+            "code": "SC2031"
+          },
+          {
+            "source": "install.sh",
+            "line": 3970,
+            "code": "SC2031"
+          },
+          {
+            "source": "install.sh",
+            "line": 3995,
+            "code": "SC2031"
+          },
+          {
+            "source": "install.sh",
+            "line": 3996,
+            "code": "SC2031"
+          },
+          {
+            "source": "install.sh",
+            "line": 3997,
+            "code": "SC2031"
+          },
+          {
+            "source": "install.sh",
+            "line": 3998,
+            "code": "SC2031"
+          },
+          {
+            "source": "install.sh",
+            "line": 4084,
+            "code": "SC2119"
+          },
+          {
+            "source": "install.sh",
+            "line": 4108,
+            "code": "SC2015"
+          },
+          {
+            "source": "tests/static.sh",
+            "line": 318,
+            "code": "SC1012"
+          },
+          {
+            "source": "tests/static.sh",
+            "line": 943,
+            "code": "SC2016"
+          },
+          {
+            "source": "tests/static.sh",
+            "line": 944,
+            "code": "SC2016"
+          },
+          {
+            "source": "tests/static.sh",
+            "line": 945,
+            "code": "SC2016"
+          },
+          {
+            "source": "tests/integration.sh",
+            "line": 235,
+            "code": "SC2317"
+          },
+          {
+            "source": "tests/integration.sh",
+            "line": 380,
+            "code": "SC2030"
+          },
+          {
+            "source": "tests/integration.sh",
+            "line": 382,
+            "code": "SC2317"
+          },
+          {
+            "source": "tests/integration.sh",
+            "line": 383,
+            "code": "SC2317"
+          },
+          {
+            "source": "tests/integration.sh",
+            "line": 384,
+            "code": "SC2317"
+          },
+          {
+            "source": "tests/integration.sh",
+            "line": 405,
+            "code": "SC2031"
+          },
+          {
+            "source": "tests/integration.sh",
+            "line": 511,
+            "code": "SC2317"
+          },
+          {
+            "source": "tests/integration.sh",
+            "line": 512,
+            "code": "SC2317"
+          },
+          {
+            "source": "tests/integration.sh",
+            "line": 513,
+            "code": "SC2317"
+          },
+          {
+            "source": "tests/integration.sh",
+            "line": 514,
+            "code": "SC2317"
+          },
+          {
+            "source": "tests/integration.sh",
+            "line": 515,
+            "code": "SC2317"
+          },
+          {
+            "source": "tests/integration.sh",
+            "line": 517,
+            "code": "SC2317"
+          },
+          {
+            "source": "tests/integration.sh",
+            "line": 518,
+            "code": "SC2317"
+          },
+          {
+            "source": "tests/integration.sh",
+            "line": 521,
+            "code": "SC2030"
+          },
+          {
+            "source": "tests/integration.sh",
+            "line": 521,
+            "code": "SC2317"
+          },
+          {
+            "source": "tests/integration.sh",
+            "line": 522,
+            "code": "SC2030"
+          },
+          {
+            "source": "tests/integration.sh",
+            "line": 522,
+            "code": "SC2317"
+          },
+          {
+            "source": "tests/integration.sh",
+            "line": 524,
+            "code": "SC2317"
+          },
+          {
+            "source": "tests/integration.sh",
+            "line": 525,
+            "code": "SC2317"
+          },
+          {
+            "source": "tests/integration.sh",
+            "line": 526,
+            "code": "SC2317"
+          },
+          {
+            "source": "tests/integration.sh",
+            "line": 528,
+            "code": "SC2317"
+          },
+          {
+            "source": "tests/integration.sh",
+            "line": 529,
+            "code": "SC2317"
+          },
+          {
+            "source": "tests/integration.sh",
+            "line": 543,
+            "code": "SC2317"
+          },
+          {
+            "source": "tests/integration.sh",
+            "line": 544,
+            "code": "SC2317"
+          },
+          {
+            "source": "tests/integration.sh",
+            "line": 565,
+            "code": "SC2031"
+          },
+          {
+            "source": "tests/integration.sh",
+            "line": 566,
+            "code": "SC2031"
+          },
+          {
+            "source": "tests/integration.sh",
+            "line": 567,
+            "code": "SC2031"
+          },
+          {
+            "source": "tests/integration.sh",
+            "line": 648,
+            "code": "SC2031"
+          },
+          {
+            "source": "tests/integration.sh",
+            "line": 649,
+            "code": "SC2031"
+          },
+          {
+            "source": "tests/integration.sh",
+            "line": 654,
+            "code": "SC2031"
+          },
+          {
+            "source": "tests/integration.sh",
+            "line": 666,
+            "code": "SC2317"
+          },
+          {
+            "source": "tests/integration.sh",
+            "line": 838,
+            "code": "SC2317"
+          },
+          {
+            "source": "tests/integration.sh",
+            "line": 839,
+            "code": "SC2317"
+          },
+          {
+            "source": "tests/integration.sh",
+            "line": 840,
+            "code": "SC2317"
+          },
+          {
+            "source": "tests/integration.sh",
+            "line": 841,
+            "code": "SC2317"
+          },
+          {
+            "source": "tests/integration.sh",
+            "line": 842,
+            "code": "SC2317"
+          },
+          {
+            "source": "tests/integration.sh",
+            "line": 843,
+            "code": "SC2317"
+          },
+          {
+            "source": "tests/integration.sh",
+            "line": 844,
+            "code": "SC2317"
+          },
+          {
+            "source": "tests/integration.sh",
+            "line": 846,
+            "code": "SC2317"
+          },
+          {
+            "source": "tests/integration.sh",
+            "line": 847,
+            "code": "SC2317"
+          },
+          {
+            "source": "tests/integration.sh",
+            "line": 848,
+            "code": "SC2317"
+          },
+          {
+            "source": "tests/integration.sh",
+            "line": 849,
+            "code": "SC2317"
+          },
+          {
+            "source": "tests/integration.sh",
+            "line": 851,
+            "code": "SC2317"
+          },
+          {
+            "source": "tests/rollback.sh",
+            "line": 86,
+            "code": "SC2317"
+          },
+          {
+            "source": "tests/rollback.sh",
+            "line": 87,
+            "code": "SC2317"
+          },
+          {
+            "source": "tests/rollback.sh",
+            "line": 88,
+            "code": "SC2317"
+          },
+          {
+            "source": "tests/rollback.sh",
+            "line": 89,
+            "code": "SC2317"
+          },
+          {
+            "source": "tests/rollback.sh",
+            "line": 93,
+            "code": "SC2317"
+          },
+          {
+            "source": "tests/rollback.sh",
+            "line": 94,
+            "code": "SC2317"
+          },
+          {
+            "source": "tests/rollback.sh",
+            "line": 95,
+            "code": "SC2317"
+          }
+        ],
+        "source_locations": [],
+        "category_counts": {},
+        "rejected_scenario_count": 0,
+        "truncated": true
+      },
+      "temporary_entries_before_namespace_release": 6,
+      "isolation_started_at_utc": "2026-11-17T06:09:44.745023+00:00",
+      "isolation_completed_at_utc": "2026-11-17T06:09:52.976500+00:00",
+      "isolation_elapsed_seconds": 8.231,
+      "namespace_process_exit_observed": true
+    },
+    {
+      "suite": "tests/socks-verification.sh",
+      "started_at_utc": "2026-11-17T06:09:53.024821+00:00",
+      "completed_at_utc": "2026-11-17T06:09:55.498552+00:00",
+      "elapsed_seconds": 2.474,
+      "exit_code": 0,
+      "status": "passed",
+      "diagnostics": {
+        "scenario_counts": {
+          "passed": 26,
+          "failed": 0
+        },
+        "failed_scenarios": [],
+        "shellcheck": [],
+        "source_locations": [],
+        "category_counts": {},
+        "rejected_scenario_count": 0,
+        "truncated": false
+      },
+      "temporary_entries_before_namespace_release": 0,
+      "isolation_started_at_utc": "2026-11-17T06:09:52.977965+00:00",
+      "isolation_completed_at_utc": "2026-11-17T06:09:55.546213+00:00",
+      "isolation_elapsed_seconds": 2.568,
+      "namespace_process_exit_observed": true
+    },
+    {
+      "suite": "tests/address-refresh.sh",
+      "started_at_utc": "2026-11-17T06:09:55.591684+00:00",
+      "completed_at_utc": "2026-11-17T06:10:20.605823+00:00",
+      "elapsed_seconds": 25.014,
+      "exit_code": 0,
+      "status": "passed",
+      "diagnostics": {
+        "scenario_counts": {
+          "passed": 51,
+          "failed": 0
+        },
+        "failed_scenarios": [],
+        "shellcheck": [],
+        "source_locations": [],
+        "category_counts": {},
+        "rejected_scenario_count": 0,
+        "truncated": false
+      },
+      "temporary_entries_before_namespace_release": 0,
+      "isolation_started_at_utc": "2026-11-17T06:09:55.547459+00:00",
+      "isolation_completed_at_utc": "2026-11-17T06:10:20.655219+00:00",
+      "isolation_elapsed_seconds": 25.108,
+      "namespace_process_exit_observed": true
+    },
+    {
+      "suite": "tests/system-errors.sh",
+      "started_at_utc": "2026-11-17T06:10:20.701695+00:00",
+      "completed_at_utc": "2026-11-17T06:10:20.921065+00:00",
+      "elapsed_seconds": 0.219,
+      "exit_code": 0,
+      "status": "passed",
+      "diagnostics": {
+        "scenario_counts": {
+          "passed": 14,
+          "failed": 0
+        },
+        "failed_scenarios": [],
+        "shellcheck": [],
+        "source_locations": [],
+        "category_counts": {},
+        "rejected_scenario_count": 0,
+        "truncated": false
+      },
+      "temporary_entries_before_namespace_release": 0,
+      "isolation_started_at_utc": "2026-11-17T06:10:20.656589+00:00",
+      "isolation_completed_at_utc": "2026-11-17T06:10:20.971129+00:00",
+      "isolation_elapsed_seconds": 0.315,
+      "namespace_process_exit_observed": true
+    },
+    {
+      "suite": "tests/status-errors.sh",
+      "started_at_utc": "2026-11-17T06:10:21.017048+00:00",
+      "completed_at_utc": "2026-11-17T06:10:23.041037+00:00",
+      "elapsed_seconds": 2.024,
+      "exit_code": 0,
+      "status": "passed",
+      "diagnostics": {
+        "scenario_counts": {
+          "passed": 17,
+          "failed": 0
+        },
+        "failed_scenarios": [],
+        "shellcheck": [],
+        "source_locations": [],
+        "category_counts": {},
+        "rejected_scenario_count": 0,
+        "truncated": false
+      },
+      "temporary_entries_before_namespace_release": 11,
+      "isolation_started_at_utc": "2026-11-17T06:10:20.972441+00:00",
+      "isolation_completed_at_utc": "2026-11-17T06:10:23.092962+00:00",
+      "isolation_elapsed_seconds": 2.121,
+      "namespace_process_exit_observed": true
+    },
+    {
+      "suite": "tests/error-context.sh",
+      "started_at_utc": "2026-11-17T06:10:23.139088+00:00",
+      "completed_at_utc": "2026-11-17T06:10:23.759529+00:00",
+      "elapsed_seconds": 0.62,
+      "exit_code": 0,
+      "status": "passed",
+      "diagnostics": {
+        "scenario_counts": {
+          "passed": 8,
+          "failed": 0
+        },
+        "failed_scenarios": [],
+        "shellcheck": [],
+        "source_locations": [],
+        "category_counts": {},
+        "rejected_scenario_count": 0,
+        "truncated": false
+      },
+      "temporary_entries_before_namespace_release": 0,
+      "isolation_started_at_utc": "2026-11-17T06:10:23.094292+00:00",
+      "isolation_completed_at_utc": "2026-11-17T06:10:23.809598+00:00",
+      "isolation_elapsed_seconds": 0.715,
+      "namespace_process_exit_observed": true
+    },
+    {
+      "suite": "tests/entry-address.sh",
+      "started_at_utc": "2026-11-17T06:10:23.855448+00:00",
+      "completed_at_utc": "2026-11-17T06:10:56.783042+00:00",
+      "elapsed_seconds": 32.928,
+      "exit_code": 0,
+      "status": "passed",
+      "diagnostics": {
+        "scenario_counts": {
+          "passed": 50,
+          "failed": 0
+        },
+        "failed_scenarios": [],
+        "shellcheck": [],
+        "source_locations": [],
+        "category_counts": {},
+        "rejected_scenario_count": 0,
+        "truncated": false
+      },
+      "temporary_entries_before_namespace_release": 12,
+      "isolation_started_at_utc": "2026-11-17T06:10:23.810880+00:00",
+      "isolation_completed_at_utc": "2026-11-17T06:10:56.832460+00:00",
+      "isolation_elapsed_seconds": 33.022,
+      "namespace_process_exit_observed": true
+    },
+    {
+      "suite": "tests/preflight.sh",
+      "started_at_utc": "2026-11-17T06:10:56.878884+00:00",
+      "completed_at_utc": "2026-11-17T06:10:57.150019+00:00",
+      "elapsed_seconds": 0.271,
+      "exit_code": 0,
+      "status": "passed",
+      "diagnostics": {
+        "scenario_counts": {
+          "passed": 0,
+          "failed": 0
+        },
+        "failed_scenarios": [],
+        "shellcheck": [],
+        "source_locations": [],
+        "category_counts": {},
+        "rejected_scenario_count": 0,
+        "truncated": false
+      },
+      "temporary_entries_before_namespace_release": 0,
+      "isolation_started_at_utc": "2026-11-17T06:10:56.834156+00:00",
+      "isolation_completed_at_utc": "2026-11-17T06:10:57.198780+00:00",
+      "isolation_elapsed_seconds": 0.365,
+      "namespace_process_exit_observed": true
+    }
+  ],
+  "cleanup": {
+    "raw_logs_uploaded": false,
+    "runtime_download_retained": false,
+    "temporary_storage": "per-suite tmpfs discarded on namespace exit",
+    "private_runtime_created": true,
+    "private_runtime_removed": true
+  },
+  "exclusions": [
+    "No deployment or production credentials, state, configuration or customer data",
+    "No real VPS IP replacement, external client connectivity or cloud firewall validation",
+    "Real fixed Xray validates generated configuration; no external protocol session",
+    "Artifact contains no raw logs, fixtures, private keys, passwords or share links"
+  ],
+  "installer_version": "0.2.24",
+  "runtime": {
+    "version": "v26.3.27",
+    "archive_sha256": "23cd9af937744d97776ee35ecad4972cf4b2109d1e0fe6be9930467608f7c8ae",
+    "official_dgst_file_sha256": "052fc1c5c4bd5b44d799f785792a9631bce8da4aa0d385a783e9a711ad352a58",
+    "official_dgst_matched": true,
+    "pinned_sha256_matched": true,
+    "files_sha256": {
+      "xray": "8255dd939c34cf966cc91517b6324dd3c8d0bcf49ffac8beca049a38c46845ed",
+      "geoip.dat": "744c97b74c52bae2ac8664fef6ac481d7765cb8432a0df54f0368a88b9b4a354",
+      "geosite.dat": "adf92de0cfc70e458b399f04c5f912bf42d115ed7e37281b30e2f1c68605e4e9"
+    }
+  },
+  "source_unchanged": true,
+  "completed_at_utc": "2026-11-17T06:10:57.208846+00:00"
+}

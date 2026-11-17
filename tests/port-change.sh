@@ -43,6 +43,8 @@ assert_equal() {
 test_random_exclusions() {
   local XRAY_CHAIN_PORT='' candidate_calls=0
   local -a candidates=(62002 62007 62008 443 62003 62004 62005 62006)
+  # Called indirectly by the sourced installer or its exported fixture hooks.
+  # shellcheck disable=SC2317
   generate_auto_port_candidate() {
     AUTO_PORT_CANDIDATE="${candidates[candidate_calls]}"
     ((candidate_calls += 1))
@@ -65,6 +67,8 @@ test_exhausted_candidates() {
     candidate_calls=0
     reserved_ports=(62002 62007 62008)
     trap 'printf "%s" "$INBOUND_PORT" >"${TEST_DIR}/exhausted-port"; printf "%s" "$candidate_calls" >"${TEST_DIR}/exhausted-attempts"' EXIT
+    # Called indirectly by the sourced installer or its exported fixture hooks.
+    # shellcheck disable=SC2317
     generate_auto_port_candidate() {
       AUTO_PORT_CANDIDATE="${reserved_ports[candidate_calls % ${#reserved_ports[@]}]}"
       ((candidate_calls += 1))
@@ -90,6 +94,8 @@ test_explicit_excluded_port() {
   (
     set -e
     XRAY_CHAIN_PORT='62008'
+    # The EXIT trap records this isolated value; it must not escape the case.
+    # shellcheck disable=SC2030
     INBOUND_PORT='61234'
     trap 'printf "%s" "$INBOUND_PORT" >"${TEST_DIR}/explicit-excluded-port"' EXIT
     select_inbound_port 62002 62007 62008
@@ -107,8 +113,12 @@ test_explicit_excluded_port() {
 
 test_install_explicit_port() {
   local XRAY_CHAIN_PORT='443'
+  # Called indirectly by the sourced installer or its exported fixture hooks.
+  # shellcheck disable=SC2317
   generate_auto_port_candidate() { printf 'Explicit port unexpectedly used randomness\n' >&2; return 99; }
   select_inbound_port 2>"${TEST_DIR}/explicit-warning"
+  # select_inbound_port sets the current value; earlier cases ran in subshells.
+  # shellcheck disable=SC2031
   assert_equal "$INBOUND_PORT" 443 'Installation no longer honors an explicit common port'
   grep -q '443' "${TEST_DIR}/explicit-warning"
   grep -q '明确设置' "${TEST_DIR}/explicit-warning"
@@ -117,11 +127,15 @@ test_install_explicit_port() {
 test_install_random_port() {
   local XRAY_CHAIN_PORT='' candidate_calls=0
   local -a candidates=(443 62003 62004 62005 62002)
+  # Called indirectly by the sourced installer or its exported fixture hooks.
+  # shellcheck disable=SC2317
   generate_auto_port_candidate() {
     AUTO_PORT_CANDIDATE="${candidates[candidate_calls]}"
     ((candidate_calls += 1))
   }
   select_inbound_port
+  # select_inbound_port sets the current value; earlier cases ran in subshells.
+  # shellcheck disable=SC2031
   assert_equal "$INBOUND_PORT" 62002 'Installation changed selection without an excluded port'
   assert_equal "$candidate_calls" 5 'Installation stopped filtering unavailable ports'
 }

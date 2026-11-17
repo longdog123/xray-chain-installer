@@ -33,9 +33,9 @@
   ],
   "linux_transaction_suite": {
     "file": "tests/entry-address.sh",
-    "cases": 50,
-    "execution": "Pending GitHub-hosted Linux; not run locally",
-    "test_sha256": "a039836458f9cd1c0cea8d3baea30338e9875f0565eb9424f57f9db8f42dc9b2",
+    "cases": 52,
+    "execution": "The two new precision cases await GitHub-hosted Linux execution; no local Linux suite was run.",
+    "test_sha256": "87cda1a2da625dd69dbb1d499b32a0ebc8b259a02baabb7a37db6212e83958d1",
     "display_extension": {
       "recorded_at": "2026-11-17T06:08:08.981084+00:00",
       "new_cases": 13,
@@ -48,6 +48,15 @@
         "Legacy schema 1 terminal links/QR and auto-address opt-out with saved domain.",
         "Every displayed full link retains the domain and all other fields; QR inputs equal those links; direct exit remains the independently detected IP."
       ]
+    },
+    "numeric_extension": {
+      "recorded_at": "2026-11-17T06:18:47.669544+00:00",
+      "new_cases": 2,
+      "scope": [
+        "Large unknown integer fields remain exact on jq builds supporting lossless numeric serialization.",
+        "Candidate-only externalId rounding is rejected by the production numeric-token guard before backup or atomic write."
+      ],
+      "execution": "Pending GitHub-hosted Linux; the local fixture construction check is not a production transaction result."
     }
   },
   "cleanup": "No local runtime, network, temporary fixture, state/config or service was created by the narrow shell checks.",
@@ -55,5 +64,19 @@
     "No complete Linux suite or transaction result is claimed by this report.",
     "No WSL invocation or reconstruction, live network, VPS, customer state, credentials or service used.",
     "No complete share links, private paths, raw logs or secrets retained."
+  ],
+  "later_local_checks": [
+    {
+      "started_at": "2026-11-17T06:18:47.624995+00:00",
+      "completed_at": "2026-11-17T06:18:47.669544+00:00",
+      "test_sha256": "87cda1a2da625dd69dbb1d499b32a0ebc8b259a02baabb7a37db6212e83958d1",
+      "checks": [
+        "Bash -n passed",
+        "Embedded Python AST parsed",
+        "ShellCheck 0.9.0 exited 0 without diagnostics",
+        "Both precision fixtures preserve exact Python integers; the byte-level injection changes only one candidate externalId and never the source file"
+      ],
+      "cleanup": "Synthetic Windows temporary directory removed by TemporaryDirectory; no network, service or Linux runtime used."
+    }
   ]
 }

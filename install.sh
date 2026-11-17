@@ -671,6 +671,8 @@ configure_bbr() {
     return 0
   fi
 
+  # Read by callers that source the manager to observe this operation.
+  # shellcheck disable=SC2034
   BBR_CHANGED='yes'
   info "BBR 已启用。"
   if systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
@@ -996,9 +998,9 @@ detect_public_ipv4() {
 }
 
 eligible_share_ipv4() {
-  local address="$1" a b c d
+  local address="$1" a b c _
   valid_ipv4 "$address" || return 1
-  IFS='.' read -r a b c d <<<"$address"
+  IFS='.' read -r a b c _ <<<"$address"
   a=$((10#$a)); b=$((10#$b)); c=$((10#$c))
   # scope=global also includes private addresses; they are not public entrances.
   (( a != 0 && a != 10 && a != 127 && a < 224 )) || return 1
@@ -1090,6 +1092,15 @@ normalize_entry_address() {
   printf '%s' "$address"
 }
 
+json_number_tokens() {
+  # Read JSON as text: jq 1.6 would otherwise round large numbers before comparison.
+  # Match and discard complete quoted strings before collecting numeric lexemes.
+  jq -Rrs '
+    scan("\"(?:[^\"\\\\]|\\\\.)*\"|-?(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?(?:[eE][+-]?[0-9]+)?")
+    | select(startswith("\"") | not)
+  ' "$1"
+}
+
 detect_unique_entry_ipv4() {
   local local_json addresses address candidate='' detected count=0
   local_json="$(ip -j -4 address show scope global 2>/dev/null)" || return 1
@@ -1145,6 +1156,11 @@ command_address() {
   candidate="${work_dir}/entry-state.json"
   jq --arg address "$address" '.serverAddress = $address' "$STATE_FILE" >"$candidate" \
     || die "生成入口地址候选状态失败；原状态未修改，请检查磁盘空间。"
+  if ! json_number_tokens "$STATE_FILE" >"${work_dir}/original-numbers.txt" \
+    || ! json_number_tokens "$candidate" >"${work_dir}/candidate-numbers.txt" \
+    || ! cmp -s -- "${work_dir}/original-numbers.txt" "${work_dir}/candidate-numbers.txt"; then
+    die "入口地址候选状态无法原样保留数字字段，已停止；原状态未修改。请检查 jq 版本及状态文件，不要手动删除原字段。"
+  fi
   if ! jq -e --slurpfile before "$STATE_FILE" --arg address "$address" '
     .serverAddress == $address and (del(.serverAddress) == ($before[0] | del(.serverAddress)))
   ' "$candidate" >/dev/null; then
@@ -2001,7 +2017,7 @@ set_node_enabled_in_model() {
 remove_node_from_model() {
   local node_id="$1" model_tmp secrets_tmp
   (( $(jq '.nodes | length' "$MODEL_FILE") > 1 )) \
-    || die "不能删除最后一个节点；如不再使用，请选择“卸载全部”。"
+    || die '不能删除最后一个节点；如不再使用，请选择“卸载全部”。'
   model_tmp="${MODEL_FILE}.new"
   secrets_tmp="${SECRETS_FILE}.new"
   jq --arg id "$node_id" '.nodes |= map(select(.id != $id))' "$MODEL_FILE" >"$model_tmp"
@@ -2989,12 +3005,11 @@ prepare_connection_preview() (
   shift 2
   [[ ! -t 1 ]] || qr_mode='yes'
   # Render before changing installed files; retain the original terminal's QR mode.
-  STATE_FILE="$candidate_state"
-  resolve_display_addresses "$STATE_FILE"
+  resolve_display_addresses "$candidate_state"
   {
     info "节点配置已保存，当前待生效；以下链接将在重启成功后可用。"
     for node_id in "$@"; do
-      show_connection "$node_id" no "$qr_mode" "$RESOLVED_SHARE_ADDRESS" "$RESOLVED_DIRECT_IP"
+      STATE_FILE="$candidate_state" show_connection "$node_id" no "$qr_mode" "$RESOLVED_SHARE_ADDRESS" "$RESOLVED_DIRECT_IP"
     done
     show_brand_footer
     warn "即将重启 PuppyIP 服务；若 SSH 经过这台 VPS 的代理，连接可能中断。" 2>&1
@@ -3004,12 +3019,12 @@ prepare_connection_preview() (
 
 print_firewall_hint() {
   local port
-  local -a ports=("$@")
-  if (( ${#ports[@]} == 0 )); then
+  local -a firewall_ports=("$@")
+  if (( ${#firewall_ports[@]} == 0 )); then
     [[ -r "$STATE_FILE" ]] || return 0
-    mapfile -t ports < <(model_inbound_ports "$STATE_FILE")
+    mapfile -t firewall_ports < <(model_inbound_ports "$STATE_FILE")
   fi
-  for port in "${ports[@]}"; do
+  for port in "${firewall_ports[@]}"; do
     if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q '^Status: active'; then
       warn "UFW 正在运行。如尚未放行，请执行：ufw allow ${port}/tcp"
     fi
@@ -3303,7 +3318,7 @@ command_show() {
   require_root
   [[ -r "$STATE_FILE" ]] || die "PuppyIP Chain 尚未安装。"
   if [[ "$selector" == 'all' || -z "$selector" ]]; then
-    show_all_connections
+    show_all_connections ''
   else
     show_connection "$selector"
   fi
@@ -4081,7 +4096,7 @@ run_management_menu() {
       2) command_port; pause_menu ;;
       3) command_show all; pause_menu ;;
       4) command_edit; pause_menu ;;
-      5) command_toggle_enabled; pause_menu ;;
+      5) command_toggle_enabled ''; pause_menu ;;
       6) command_remove; pause_menu ;;
       7) command_reset; pause_menu ;;
       8) command_status; pause_menu ;;
@@ -4105,8 +4120,9 @@ main() {
       require_root
       [[ $# -eq 2 && "${2:-}" == "$SCRIPT_VERSION" ]] \
         || die "更新菜单交接版本不匹配，请重新输入 puppyip。"
-      running_as_installed_manager && installation_complete \
-        || die "更新菜单交接的安装不完整，请检查安装后重试。"
+      if ! running_as_installed_manager || ! installation_complete; then
+        die "更新菜单交接的安装不完整，请检查安装后重试。"
+      fi
       if installation_upgrade_needed; then
         die "更新菜单交接未通过版本核对，请检查安装后重试。"
       fi

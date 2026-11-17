@@ -232,6 +232,8 @@ chmod 0755 "${UPGRADE_WORK}/xray/xray"
 STATE_FILE="$GENERATED_STATE"
 CONFIG_FILE="$GENERATED_CONFIG"
 (
+  # Called indirectly by the sourced installer or its exported fixture hooks.
+  # shellcheck disable=SC2317
   assert_model_port_available() { :; }
   prepare_existing_upgrade_candidate "$UPGRADE_WORK" "$TEST_VERSION"
 )
@@ -377,10 +379,18 @@ DIRECT_CONNECTION_OUTPUT="$(show_connection 3)"
   FRESH_PORT_DIR="${TEST_DIR}/fresh-ports"
   mkdir -p "$FRESH_PORT_DIR"
   MODEL_FILE="${FRESH_PORT_DIR}/model.json"
+  # This fresh-install fixture must not replace the parent fixture paths.
+  # shellcheck disable=SC2030
   SECRETS_FILE="${FRESH_PORT_DIR}/secrets.json"
   STATE_FILE="${FRESH_PORT_DIR}/not-installed.json"
+  # Called indirectly by the sourced installer or its exported fixture hooks.
+  # shellcheck disable=SC2317
   collect_panel_reserved_ports() { PANEL_RESERVED_PORTS=(); }
+  # Called indirectly by the sourced installer or its exported fixture hooks.
+  # shellcheck disable=SC2317
   port_is_listening() { return 1; }
+  # Called indirectly by the sourced installer or its exported fixture hooks.
+  # shellcheck disable=SC2317
   generate_auto_port_candidate() { AUTO_PORT_CANDIDATE=62050; }
   XRAY_CHAIN_PORT=443
   NODE_TYPE='direct'
@@ -402,6 +412,8 @@ DIRECT_CONNECTION_OUTPUT="$(show_connection 3)"
 # but removes every route to that outbound and sends the user to blocked.
 # Resuming restores the same link. A configuration with every node paused is
 # valid too.
+# Deliberately retain the parent path after the isolated fresh-install fixture.
+# shellcheck disable=SC2031
 BASE_SECRETS_FILE="$SECRETS_FILE"
 PAUSE_MODEL="${TEST_DIR}/pause-model.json"
 PAUSE_SECRETS="${TEST_DIR}/pause-secrets.json"
@@ -508,22 +520,44 @@ cp -- "$BASE_SECRETS_FILE" "$COMMAND_SECRETS"
 (
   DEPLOY_CALLS=0
   CONFIRM_CALLS=0
+  # Called indirectly by the sourced installer or its exported fixture hooks.
+  # shellcheck disable=SC2317
   refresh_brand_banner() { :; }
+  # Called indirectly by the sourced installer or its exported fixture hooks.
+  # shellcheck disable=SC2317
   require_root() { :; }
+  # Called indirectly by the sourced installer or its exported fixture hooks.
+  # shellcheck disable=SC2317
   check_platform() { :; }
+  # Called indirectly by the sourced installer or its exported fixture hooks.
+  # shellcheck disable=SC2317
   require_systemd() { :; }
+  # Called indirectly by the sourced installer or its exported fixture hooks.
+  # shellcheck disable=SC2317
   acquire_lock() { :; }
+  # Called indirectly by the sourced installer or its exported fixture hooks.
+  # shellcheck disable=SC2317
   new_temp_dir() {
     LAST_TEMP_DIR="${TEST_DIR}/command-work"
     mkdir -p "$LAST_TEMP_DIR"
   }
+  # The sourced CLI invokes this mock only inside this isolated command fixture.
+  # shellcheck disable=SC2317,SC2030
   prepare_existing_operation() {
     MODEL_FILE="$COMMAND_MODEL"
     SECRETS_FILE="$COMMAND_SECRETS"
   }
+  # Called indirectly by the sourced installer or its exported fixture hooks.
+  # shellcheck disable=SC2317
   deploy_model_change() { ((DEPLOY_CALLS += 1)); }
+  # Called indirectly by the sourced installer or its exported fixture hooks.
+  # shellcheck disable=SC2317
   print_node_list_file() { :; }
+  # Called indirectly by the sourced installer or its exported fixture hooks.
+  # shellcheck disable=SC2317
   info() { :; }
+  # Called indirectly by the sourced installer or its exported fixture hooks.
+  # shellcheck disable=SC2317
   confirm_destructive_action() {
     ((CONFIRM_CALLS += 1))
     return 1
@@ -539,6 +573,8 @@ cp -- "$BASE_SECRETS_FILE" "$COMMAND_SECRETS"
   command_toggle_enabled 1
   jq -e '.nodes[] | select(.id == "node-1") | .enabled == true' "$COMMAND_MODEL" >/dev/null
   [[ "$DEPLOY_CALLS" == '2' && "$CONFIRM_CALLS" == '1' ]]
+  # Called indirectly by the sourced installer or its exported fixture hooks.
+  # shellcheck disable=SC2317
   confirm_destructive_action() {
     ((CONFIRM_CALLS += 1))
     return 0
@@ -558,12 +594,16 @@ CONFIG_FILE="$GENERATED_CONFIG"
 ROUNDTRIP_WORK="${TEST_DIR}/mixed-roundtrip"
 mkdir -p "$ROUNDTRIP_WORK"
 load_model "$ROUNDTRIP_WORK" "$TEST_XRAY"
+# load_model sets these parent paths; earlier command mocks were subshell-local.
+# shellcheck disable=SC2031
 jq -e '
   (.nodes[] | select(.id == "node-1") | .type) == "socks"
   and (.nodes[] | select(.id == "node-2") | .type) == "socks"
   and (.nodes[] | select(.id == "node-3") | .type) == "direct"
 ' "$MODEL_FILE" >/dev/null
+# shellcheck disable=SC2031
 jq -e 'all(.nodes[]; .enabled == true)' "$MODEL_FILE" >/dev/null
+# shellcheck disable=SC2031
 jq -e 'has("node-3") | not' "$SECRETS_FILE" >/dev/null
 
 # Legacy schema 1 must migrate without changing the original UUID, short ID,
@@ -634,6 +674,8 @@ jq -n --arg private_key "$PRIVATE_KEY" --arg pass 'legacy-test-password' '
 MIGRATION_WORK="${LEGACY_DIR}/work"
 mkdir -p "$MIGRATION_WORK"
 load_model "$MIGRATION_WORK" "$TEST_XRAY"
+# load_model sets these parent paths; earlier command mocks were subshell-local.
+# shellcheck disable=SC2031
 jq -e '
   .schema == 2
   and .inboundPort == 8443
@@ -646,11 +688,14 @@ jq -e '
   and .nodes[0].socksPort == 3080
   and .nextNodeNumber == 2
 ' "$MODEL_FILE" >/dev/null
+# shellcheck disable=SC2031
 jq -e '."node-1" == "legacy-test-password"' "$SECRETS_FILE" >/dev/null
 [[ "$PRIVATE_KEY" != "" ]]
 MIGRATED_STATE="${LEGACY_DIR}/migrated-state.json"
 MIGRATED_CONFIG="${LEGACY_DIR}/migrated-config.json"
 render_state "$MIGRATED_STATE" "$TEST_VERSION"
+# Use the migration secrets populated by load_model in this shell.
+# shellcheck disable=SC2031
 render_config "$MIGRATED_CONFIG" "$MIGRATION_WORK" "$MIGRATED_STATE" "$SECRETS_FILE"
 assert_upgrade_invariants "$STATE_FILE" "$CONFIG_FILE" "$MIGRATED_STATE" "$MIGRATED_CONFIG"
 XRAY_LOCATION_ASSET="$TEST_ASSETS" "$TEST_XRAY" run -test -c "$MIGRATED_CONFIG"
@@ -662,6 +707,8 @@ cp -- "$GENERATED_STATE" "$MODEL_FILE"
 jq -n --arg pass 'fixture-password' '{"node-1": $pass, "node-2": ""}' >"$SECRETS_FILE"
 remove_node_from_model node-1
 [[ "$(jq -r '.nextNodeNumber' "$MODEL_FILE")" == '4' ]]
+# Called indirectly by the sourced installer or its exported fixture hooks.
+# shellcheck disable=SC2317
 collect_socks_batch_settings() {
   SOCKS_BATCH_ENTRIES=(
     '127.0.0.4:4080:node-three-user:node-three-password'
@@ -835,13 +882,29 @@ set +e
   LEGACY_MANAGER_BIN="${DEPLOY_ROOT}/xray-chain"
   RUNTIME_GROUP='root'
   ATOMIC_CALLS=0
+  # Called indirectly by the sourced installer or its exported fixture hooks.
+  # shellcheck disable=SC2317
   ensure_runtime_layout() { mkdir -p "$DATA_DIR" "$BACKUP_DIR"; }
+  # Called indirectly by the sourced installer or its exported fixture hooks.
+  # shellcheck disable=SC2317
   render_state() { cp -- "$MODEL_FILE" "$1"; }
+  # Called indirectly by the sourced installer or its exported fixture hooks.
+  # shellcheck disable=SC2317
   render_config() { printf 'candidate-config' >"$1"; }
+  # Called indirectly by the sourced installer or its exported fixture hooks.
+  # shellcheck disable=SC2317
   validate_config() { :; }
+  # Called indirectly by the sourced installer or its exported fixture hooks.
+  # shellcheck disable=SC2317
   assert_model_port_available() { :; }
+  # Called indirectly by the sourced installer or its exported fixture hooks.
+  # shellcheck disable=SC2317
   prepare_manager_copy() { printf 'candidate-manager' >"$1"; }
+  # Called indirectly by the sourced installer or its exported fixture hooks.
+  # shellcheck disable=SC2317
   systemctl() { return 0; }
+  # Called indirectly by the sourced installer or its exported fixture hooks.
+  # shellcheck disable=SC2317
   atomic_install() {
     local source="$1" destination="$2"
     ((ATOMIC_CALLS += 1))

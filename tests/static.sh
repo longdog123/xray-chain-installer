@@ -315,7 +315,7 @@ bash -c '
     check_platform() { :; }
     require_systemd() { :; }
     show_brand_banner() { :; }
-    info() { printf '%s\n' "$*"; }
+    info() { printf "%s\n" "$*"; }
     # Event files retain ordering across subshells and failed operations.
     remote_calls="$upgrade_fixture_dir/calls"
     eval "$(declare -f prompt_yes_no | sed "1s/prompt_yes_no/original_prompt_yes_no/")"
@@ -919,6 +919,8 @@ if grep -En -- '--no-check-certificate|curl[^\n]*(--insecure|-k)([[:space:]]|$)|
   exit 1
 fi
 
+# These are literal source fragments; expansion would defeat the assertions.
+# shellcheck disable=SC2016
 for required in \
   'run -test -c' \
   'SHA2-256=' \

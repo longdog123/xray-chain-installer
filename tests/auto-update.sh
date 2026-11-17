@@ -64,8 +64,14 @@ run_worker() {
     handoff-legacy-path) SCRIPT_SOURCE="$LEGACY_MANAGER_BIN" ;;
   esac
 
+  # Called indirectly by the sourced installer or its exported fixture hooks.
+  # shellcheck disable=SC2317
   require_root() { printf '__ROOT__\n'; }
+  # Called indirectly by the sourced installer or its exported fixture hooks.
+  # shellcheck disable=SC2317
   show_brand_banner() { printf '__BANNER__\n'; }
+  # Called indirectly by the sourced installer or its exported fixture hooks.
+  # shellcheck disable=SC2317
   show_menu() {
     if [[ "$AUTO_REEXEC_MENU" == 'yes' ]]; then
       printf '__NEW_MENU__\n'
@@ -74,15 +80,25 @@ run_worker() {
       printf '__OLD_MENU__\n'
     fi
   }
+  # Called indirectly by the sourced installer or its exported fixture hooks.
+  # shellcheck disable=SC2317
   command_add() { printf '__ADD__\n'; }
+  # Called indirectly by the sourced installer or its exported fixture hooks.
+  # shellcheck disable=SC2317
   command_status() { printf '__STATUS__\n'; }
+  # Called indirectly by the sourced installer or its exported fixture hooks.
+  # shellcheck disable=SC2317
   systemctl() { printf 'Unexpected service operation\n' >&2; return 99; }
+  # Called indirectly by the sourced installer or its exported fixture hooks.
+  # shellcheck disable=SC2317
   new_temp_dir() {
     [[ "$AUTO_SCENARIO" != 'temp-failure' ]] || return 1
     LAST_TEMP_DIR="$(mktemp -d /tmp/xray-chain.autoupdate-test.XXXXXXXX)"
     TEMP_DIRS+=("$LAST_TEMP_DIR")
     printf '%s\n' "$LAST_TEMP_DIR" >>"${AUTO_CASE_DIR}/temp-dirs"
   }
+  # Called indirectly by the sourced installer or its exported fixture hooks.
+  # shellcheck disable=SC2317
   curl() {
     local destination='' url="${!#}" previous='' argument
     python3 -c 'import json,sys; open(sys.argv[1], "a").write(json.dumps(sys.argv[2:]) + "\n")' \
@@ -113,6 +129,8 @@ run_worker() {
   }
 
   {
+    # Defer these variables to the generated candidate subprocess.
+    # shellcheck disable=SC2016
     printf '%s\n' 'MANAGER_BIN="${AUTO_CASE_DIR}/installed/puppyip"' \
       'LEGACY_MANAGER_BIN="${AUTO_CASE_DIR}/installed/xray-chain"' \
       'STATE_FILE="${AUTO_CASE_DIR}/installed/state.json"' \
