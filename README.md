@@ -31,7 +31,7 @@ v2rayN / Shadowrocket
 bash <(curl -fsSL https://raw.githubusercontent.com/longdog123/xray-chain-installer/main/install.sh)
 ```
 
-运行后按提示选择出口：直接回车会创建使用 VPS 本机公网 IP 的直连节点；粘贴一条 SOCKS5 会创建一个固定代理出口；一次粘贴多条则会批量创建多个独立节点。SOCKS5 格式为：
+首次运行先选择入口域名，直接回车使用 VPS 本机 IP，填写域名则让全部线路共用它。随后在出口提示处，直接回车创建 VPS 本机直连节点；粘贴一条 SOCKS5 创建一个固定代理出口；一次粘贴多条则批量创建多个独立节点。SOCKS5 格式为：
 
 ```text
 IP:端口:用户名:密码
@@ -185,7 +185,7 @@ puppyip address node.example.com
 
 REALITY 不需要为这个入口域名申请或续期 TLS 证书。**入口域名不是 REALITY 的 SNI**，不要把原链接中的 SNI 随之替换。[REALITY 官方客户端示例](https://github.com/XTLS/REALITY/blob/main/README.en.md)、[Cloudflare 代理限制](https://developers.cloudflare.com/dns/proxy-status/limitations/)
 
-恢复自动 IP 入口可执行 `puppyip address auto`；无法可靠判定本机公网 IP 时会保留原地址，也可明确指定 IPv4。首次安装可以预设 `XRAY_CHAIN_ADDRESS=node.example.com`，未设置时保持原来的自动 IP 方式。后续升级保留已选域名。
+恢复自动 IP 入口可执行 `puppyip address auto`；无法可靠判定本机公网 IP 时会保留原地址，也可明确指定 IPv4。首次安装可以预设 `XRAY_CHAIN_ADDRESS=node.example.com`，未预设时交互安装会询问入口域名，直接回车使用自动 IP；无终端的自动化调用默认使用自动 IP。后续升级保留已选域名。
 
 从 `0.2.22` 起，同一台 VPS 更换公网 IPv4 后，查看线路、新增与换端口的预览、安装完成、修改出口和重置后的链接与二维码都会使用检测确认的当前入口地址，无需再次确认。选择菜单 `3`、执行 `puppyip show all` 或 `puppyip show <编号>` 均使用同一套取址规则。刷新显示只改变链接中的地址；端口、UUID、REALITY 参数等仍由对应操作及原配置决定，其他线路保持兼容。单纯查看不改写节点配置、不重启服务，客户端中已导入的旧地址仍需重新导入新链接或自行修改。
 
