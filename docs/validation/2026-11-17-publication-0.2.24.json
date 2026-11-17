@@ -1,0 +1,43 @@
+{
+  "verified_at_utc": "2026-11-17T07:39:50.163663+00:00",
+  "version": "0.2.24",
+  "published_source_commit": "5fafdd72971da64682a048e266e6580fac0735e5",
+  "installer_sha256": "b9e9ada767c4ad563eb9c9c105016d45bf9cc532dc36597c5df0b7a40247ba54",
+  "public_downloads": [
+    {
+      "source": "main",
+      "url": "https://raw.githubusercontent.com/longdog123/xray-chain-installer/main/install.sh",
+      "passed": true,
+      "sha256": "b9e9ada767c4ad563eb9c9c105016d45bf9cc532dc36597c5df0b7a40247ba54",
+      "version": "0.2.24",
+      "curl_exit_code": 0
+    },
+    {
+      "source": "legacy",
+      "url": "https://raw.githubusercontent.com/feng9254/xray-chain-installer/main/install.sh",
+      "passed": true,
+      "sha256": "b9e9ada767c4ad563eb9c9c105016d45bf9cc532dc36597c5df0b7a40247ba54",
+      "version": "0.2.24",
+      "curl_exit_code": 0
+    },
+    {
+      "source": "commit",
+      "url": "https://raw.githubusercontent.com/longdog123/xray-chain-installer/5fafdd72971da64682a048e266e6580fac0735e5/install.sh",
+      "passed": true,
+      "sha256": "b9e9ada767c4ad563eb9c9c105016d45bf9cc532dc36597c5df0b7a40247ba54",
+      "version": "0.2.24",
+      "curl_exit_code": 0
+    }
+  ],
+  "transport": "explicit local HTTP proxy",
+  "main_legacy_and_commit_downloads_match": true,
+  "hosted_source_commit": "3a4e6ff95b92f1bbd07073de82a126b93d4c70bf",
+  "hosted_run_id": "44031554206",
+  "validation": "13 hosted suites and 57 entry-address cases passed; all 17 recorded source/workflow hashes unchanged",
+  "customer_servers_updated": false,
+  "dns_records_changed": false,
+  "exclusions": [
+    "Public download identity does not establish client reachability or customer installation",
+    "No real customer config, links, credentials, private paths or raw logs included"
+  ]
+}

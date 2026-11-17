@@ -72,3 +72,19 @@ synthetic fixtures. They do not establish customer DNS propagation, external
 client reachability, firewall behavior or successful real VPS replacement.
 No customer server or DNS record was changed, and no production release was
 performed by these runs.
+
+## Authorized publication
+
+The owner subsequently authorized publication on 2026-11-17. `main` advanced
+from `71343020ec70605f03fd18b3ecf45129758633db` to the verified release commit
+`5fafdd72971da64682a048e266e6580fac0735e5` by a normal fast-forward push. The
+preflight checks passed again, the hosted run remained successful, and every
+recorded source/workflow/test hash still matched the release. The unchanged
+full suites were not repeated.
+
+[Public download verification](2026-11-17-publication-0.2.24.json) confirms
+that the current installation URL, the legacy redirected URL and the fixed
+release-commit URL all returned version 0.2.24 with installer SHA-256
+`b9e9ada767c4ad563eb9c9c105016d45bf9cc532dc36597c5df0b7a40247ba54`.
+The publication evidence commit changes documentation only. No customer
+server was updated directly and no DNS record was modified.
