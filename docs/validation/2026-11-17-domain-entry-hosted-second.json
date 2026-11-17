@@ -1,0 +1,434 @@
+{
+  "schema": 1,
+  "kind": "github_hosted_linux_regressions",
+  "status": "passed",
+  "started_at_utc": "2026-11-17T06:21:25.696107+00:00",
+  "source_sha": "313c56170d290926785a637fe077692c4c235dc7",
+  "workflow_sha": "313c56170d290926785a637fe077692c4c235dc7",
+  "workflow_file_sha256": "9fa9716f7180f5e1325504f5caf4c8ddb68c2dfcd9eb5f5bb38887bc990ca0ed",
+  "run_id": "44030569668",
+  "run_attempt": "1",
+  "repository": "longdog123/xray-chain-installer",
+  "ref": "refs/heads/codex/domain-entry-address",
+  "file_sha256": {
+    "install.sh": "a06ecc76e8255cb201d84673bc0c6b14444ff76e31bfe2eb1336120139690e11",
+    ".github/workflows/tests.yml": "9fa9716f7180f5e1325504f5caf4c8ddb68c2dfcd9eb5f5bb38887bc990ca0ed",
+    "tests/add-preview.sh": "852179f2f178d2affebc67479af1e7a4fe4cc0b753e1222d37d1c2c2823ec905",
+    "tests/address-refresh.sh": "420e2ca0368d457b8fed12a14d57eda90751e40cede90bf8b877f1692b0d78e4",
+    "tests/auto-update.sh": "c76f95f8ee9da1dc40ba0537e6002b473608a5f59ec967b52153b58843ad618b",
+    "tests/entry-address.sh": "87cda1a2da625dd69dbb1d499b32a0ebc8b259a02baabb7a37db6212e83958d1",
+    "tests/error-context.sh": "b81201322f6b104e17ad7468e0ba590a29efb208c5268296869fe2c923143093",
+    "tests/integration.sh": "a6f55dd0e8606c3064da1867a6b2315268dd6fd44ae5c3e72b8a4b56557f2436",
+    "tests/port-change.sh": "c6c0c9214fea77ebe33efd5da85bf2bd61c9e3610e1689c0aceced982077234b",
+    "tests/preflight.sh": "6e07f3ca04956161c90c83243f8bba5d2f98cd6a13d45c9a99301af7245e46e4",
+    "tests/rollback.sh": "30dd3ec84f4f3d976a77ad986ff48ecb7ce0c49120f06aba5f619c0e384ed5bc",
+    "tests/socks-verification.sh": "817b27d979b71717c3347a6cdc20fae7cde337e4ab5eaffb32bec8cfc327800d",
+    "tests/static.sh": "2acb194755ca8428a40c313a4e38070a8694aba1891317caf57a4e2479bb2c1d",
+    "tests/status-errors.sh": "b172d3dfeb0db4c5557dfd321cee8120e12707b376dcff53eb3477cac813a542",
+    "tests/system-errors.sh": "07b603546e3b856c1bd726707479c98d10746e19ce2320f6ced0e4df6fda8cf0",
+    "tests/ci.py": "814f07d6f56910a561bce28a5d953526f7689650c577cc2e0585445c0c23a316",
+    "tests/ci_unit.py": "9f34f9ac065018fd2e28cf311e00c59b3f9f084f0ecdd878790db0ca8450ba27"
+  },
+  "timing_clock": "monotonic; UTC timestamps recorded separately",
+  "environment": {
+    "os": "ubuntu-24.04",
+    "architecture": "x86_64",
+    "root_for_fixture_ownership": true,
+    "per_suite_network": "isolated",
+    "package_versions": {
+      "bash": "5.2.21-2ubuntu4",
+      "ca-certificates": "20260816ubuntu0.24.04.2",
+      "coreutils": "9.4-3ubuntu6.3",
+      "curl": "8.5.0-2ubuntu10.16",
+      "diffutils": "1:3.10-1ubuntu0.1",
+      "findutils": "4.9.0-5build1",
+      "gawk": "1:5.2.1-2ubuntu0.1",
+      "git": "1:2.56.1-0ppa1~ubuntu24.04.1",
+      "grep": "3.11-4build1",
+      "iproute2": "6.1.0-1ubuntu6.4",
+      "jq": "1.7.1-3ubuntu0.24.04.2",
+      "kmod": "31+20240202-2ubuntu7.2",
+      "openssl": "3.0.13-0ubuntu3.16",
+      "passwd": "1:4.13+dfsg1-4ubuntu3.2",
+      "procps": "2:4.0.4-4ubuntu3.3",
+      "python3": "3.12.3-0ubuntu2.1",
+      "sed": "4.9-2ubuntu0.24.04.1",
+      "shellcheck": "0.9.0-1",
+      "sqlite3": "3.45.1-1ubuntu2.9",
+      "unzip": "6.0-28ubuntu4.1",
+      "util-linux": "2.39.3-9ubuntu6.6"
+    }
+  },
+  "stages": [
+    {
+      "stage": "package_index",
+      "exit_code": 0,
+      "elapsed_seconds": 17.052
+    },
+    {
+      "stage": "test_dependencies",
+      "exit_code": 0,
+      "elapsed_seconds": 0.415
+    },
+    {
+      "stage": "runner_unit_tests",
+      "exit_code": 0,
+      "elapsed_seconds": 0.365
+    }
+  ],
+  "results": [
+    {
+      "suite": "tests/integration.sh",
+      "started_at_utc": "2026-11-17T06:21:44.594151+00:00",
+      "completed_at_utc": "2026-11-17T06:21:46.614942+00:00",
+      "elapsed_seconds": 2.021,
+      "exit_code": 0,
+      "status": "passed",
+      "diagnostics": {
+        "scenario_counts": {
+          "passed": 0,
+          "failed": 0
+        },
+        "failed_scenarios": [],
+        "shellcheck": [],
+        "source_locations": [],
+        "category_counts": {},
+        "rejected_scenario_count": 0,
+        "truncated": false
+      },
+      "temporary_entries_before_namespace_release": 0,
+      "isolation_started_at_utc": "2026-11-17T06:21:44.522824+00:00",
+      "isolation_completed_at_utc": "2026-11-17T06:21:46.628434+00:00",
+      "isolation_elapsed_seconds": 2.106,
+      "namespace_process_exit_observed": true
+    },
+    {
+      "suite": "tests/add-preview.sh",
+      "started_at_utc": "2026-11-17T06:21:46.659727+00:00",
+      "completed_at_utc": "2026-11-17T06:21:53.387670+00:00",
+      "elapsed_seconds": 6.728,
+      "exit_code": 0,
+      "status": "passed",
+      "diagnostics": {
+        "scenario_counts": {
+          "passed": 29,
+          "failed": 0
+        },
+        "failed_scenarios": [],
+        "shellcheck": [],
+        "source_locations": [],
+        "category_counts": {},
+        "rejected_scenario_count": 0,
+        "truncated": false
+      },
+      "temporary_entries_before_namespace_release": 0,
+      "isolation_started_at_utc": "2026-11-17T06:21:46.628914+00:00",
+      "isolation_completed_at_utc": "2026-11-17T06:21:53.403352+00:00",
+      "isolation_elapsed_seconds": 6.774,
+      "namespace_process_exit_observed": true
+    },
+    {
+      "suite": "tests/port-change.sh",
+      "started_at_utc": "2026-11-17T06:21:53.434902+00:00",
+      "completed_at_utc": "2026-11-17T06:21:53.501769+00:00",
+      "elapsed_seconds": 0.067,
+      "exit_code": 0,
+      "status": "passed",
+      "diagnostics": {
+        "scenario_counts": {
+          "passed": 5,
+          "failed": 0
+        },
+        "failed_scenarios": [],
+        "shellcheck": [],
+        "source_locations": [],
+        "category_counts": {},
+        "rejected_scenario_count": 0,
+        "truncated": false
+      },
+      "temporary_entries_before_namespace_release": 0,
+      "isolation_started_at_utc": "2026-11-17T06:21:53.403811+00:00",
+      "isolation_completed_at_utc": "2026-11-17T06:21:53.517690+00:00",
+      "isolation_elapsed_seconds": 0.114,
+      "namespace_process_exit_observed": true
+    },
+    {
+      "suite": "tests/rollback.sh",
+      "started_at_utc": "2026-11-17T06:21:53.548905+00:00",
+      "completed_at_utc": "2026-11-17T06:21:53.916242+00:00",
+      "elapsed_seconds": 0.367,
+      "exit_code": 0,
+      "status": "passed",
+      "diagnostics": {
+        "scenario_counts": {
+          "passed": 0,
+          "failed": 0
+        },
+        "failed_scenarios": [],
+        "shellcheck": [],
+        "source_locations": [],
+        "category_counts": {},
+        "rejected_scenario_count": 0,
+        "truncated": false
+      },
+      "temporary_entries_before_namespace_release": 0,
+      "isolation_started_at_utc": "2026-11-17T06:21:53.518085+00:00",
+      "isolation_completed_at_utc": "2026-11-17T06:21:53.932469+00:00",
+      "isolation_elapsed_seconds": 0.414,
+      "namespace_process_exit_observed": true
+    },
+    {
+      "suite": "tests/auto-update.sh",
+      "started_at_utc": "2026-11-17T06:21:53.963485+00:00",
+      "completed_at_utc": "2026-11-17T06:21:55.983902+00:00",
+      "elapsed_seconds": 2.02,
+      "exit_code": 0,
+      "status": "passed",
+      "diagnostics": {
+        "scenario_counts": {
+          "passed": 35,
+          "failed": 0
+        },
+        "failed_scenarios": [],
+        "shellcheck": [],
+        "source_locations": [],
+        "category_counts": {},
+        "rejected_scenario_count": 0,
+        "truncated": false
+      },
+      "temporary_entries_before_namespace_release": 0,
+      "isolation_started_at_utc": "2026-11-17T06:21:53.932909+00:00",
+      "isolation_completed_at_utc": "2026-11-17T06:21:55.999920+00:00",
+      "isolation_elapsed_seconds": 2.067,
+      "namespace_process_exit_observed": true
+    },
+    {
+      "suite": "tests/static.sh",
+      "started_at_utc": "2026-11-17T06:21:56.032110+00:00",
+      "completed_at_utc": "2026-11-17T06:22:02.012619+00:00",
+      "elapsed_seconds": 5.981,
+      "exit_code": 0,
+      "status": "passed",
+      "diagnostics": {
+        "scenario_counts": {
+          "passed": 0,
+          "failed": 0
+        },
+        "failed_scenarios": [],
+        "shellcheck": [],
+        "source_locations": [],
+        "category_counts": {},
+        "rejected_scenario_count": 0,
+        "truncated": false
+      },
+      "temporary_entries_before_namespace_release": 6,
+      "isolation_started_at_utc": "2026-11-17T06:21:56.000442+00:00",
+      "isolation_completed_at_utc": "2026-11-17T06:22:02.026299+00:00",
+      "isolation_elapsed_seconds": 6.026,
+      "namespace_process_exit_observed": true
+    },
+    {
+      "suite": "tests/socks-verification.sh",
+      "started_at_utc": "2026-11-17T06:22:02.059077+00:00",
+      "completed_at_utc": "2026-11-17T06:22:03.829013+00:00",
+      "elapsed_seconds": 1.77,
+      "exit_code": 0,
+      "status": "passed",
+      "diagnostics": {
+        "scenario_counts": {
+          "passed": 26,
+          "failed": 0
+        },
+        "failed_scenarios": [],
+        "shellcheck": [],
+        "source_locations": [],
+        "category_counts": {},
+        "rejected_scenario_count": 0,
+        "truncated": false
+      },
+      "temporary_entries_before_namespace_release": 0,
+      "isolation_started_at_utc": "2026-11-17T06:22:02.026830+00:00",
+      "isolation_completed_at_utc": "2026-11-17T06:22:03.843490+00:00",
+      "isolation_elapsed_seconds": 1.817,
+      "namespace_process_exit_observed": true
+    },
+    {
+      "suite": "tests/address-refresh.sh",
+      "started_at_utc": "2026-11-17T06:22:03.875390+00:00",
+      "completed_at_utc": "2026-11-17T06:22:20.869896+00:00",
+      "elapsed_seconds": 16.995,
+      "exit_code": 0,
+      "status": "passed",
+      "diagnostics": {
+        "scenario_counts": {
+          "passed": 51,
+          "failed": 0
+        },
+        "failed_scenarios": [],
+        "shellcheck": [],
+        "source_locations": [],
+        "category_counts": {},
+        "rejected_scenario_count": 0,
+        "truncated": false
+      },
+      "temporary_entries_before_namespace_release": 0,
+      "isolation_started_at_utc": "2026-11-17T06:22:03.844154+00:00",
+      "isolation_completed_at_utc": "2026-11-17T06:22:20.885088+00:00",
+      "isolation_elapsed_seconds": 17.041,
+      "namespace_process_exit_observed": true
+    },
+    {
+      "suite": "tests/system-errors.sh",
+      "started_at_utc": "2026-11-17T06:22:20.917012+00:00",
+      "completed_at_utc": "2026-11-17T06:22:21.084266+00:00",
+      "elapsed_seconds": 0.167,
+      "exit_code": 0,
+      "status": "passed",
+      "diagnostics": {
+        "scenario_counts": {
+          "passed": 14,
+          "failed": 0
+        },
+        "failed_scenarios": [],
+        "shellcheck": [],
+        "source_locations": [],
+        "category_counts": {},
+        "rejected_scenario_count": 0,
+        "truncated": false
+      },
+      "temporary_entries_before_namespace_release": 0,
+      "isolation_started_at_utc": "2026-11-17T06:22:20.885682+00:00",
+      "isolation_completed_at_utc": "2026-11-17T06:22:21.099790+00:00",
+      "isolation_elapsed_seconds": 0.214,
+      "namespace_process_exit_observed": true
+    },
+    {
+      "suite": "tests/status-errors.sh",
+      "started_at_utc": "2026-11-17T06:22:21.131890+00:00",
+      "completed_at_utc": "2026-11-17T06:22:22.501267+00:00",
+      "elapsed_seconds": 1.369,
+      "exit_code": 0,
+      "status": "passed",
+      "diagnostics": {
+        "scenario_counts": {
+          "passed": 17,
+          "failed": 0
+        },
+        "failed_scenarios": [],
+        "shellcheck": [],
+        "source_locations": [],
+        "category_counts": {},
+        "rejected_scenario_count": 0,
+        "truncated": false
+      },
+      "temporary_entries_before_namespace_release": 11,
+      "isolation_started_at_utc": "2026-11-17T06:22:21.100365+00:00",
+      "isolation_completed_at_utc": "2026-11-17T06:22:22.516292+00:00",
+      "isolation_elapsed_seconds": 1.416,
+      "namespace_process_exit_observed": true
+    },
+    {
+      "suite": "tests/error-context.sh",
+      "started_at_utc": "2026-11-17T06:22:22.548005+00:00",
+      "completed_at_utc": "2026-11-17T06:22:23.015751+00:00",
+      "elapsed_seconds": 0.468,
+      "exit_code": 0,
+      "status": "passed",
+      "diagnostics": {
+        "scenario_counts": {
+          "passed": 8,
+          "failed": 0
+        },
+        "failed_scenarios": [],
+        "shellcheck": [],
+        "source_locations": [],
+        "category_counts": {},
+        "rejected_scenario_count": 0,
+        "truncated": false
+      },
+      "temporary_entries_before_namespace_release": 0,
+      "isolation_started_at_utc": "2026-11-17T06:22:22.516920+00:00",
+      "isolation_completed_at_utc": "2026-11-17T06:22:23.031482+00:00",
+      "isolation_elapsed_seconds": 0.515,
+      "namespace_process_exit_observed": true
+    },
+    {
+      "suite": "tests/entry-address.sh",
+      "started_at_utc": "2026-11-17T06:22:23.063313+00:00",
+      "completed_at_utc": "2026-11-17T06:22:48.571871+00:00",
+      "elapsed_seconds": 25.509,
+      "exit_code": 0,
+      "status": "passed",
+      "diagnostics": {
+        "scenario_counts": {
+          "passed": 52,
+          "failed": 0
+        },
+        "failed_scenarios": [],
+        "shellcheck": [],
+        "source_locations": [],
+        "category_counts": {},
+        "rejected_scenario_count": 0,
+        "truncated": false
+      },
+      "temporary_entries_before_namespace_release": 14,
+      "isolation_started_at_utc": "2026-11-17T06:22:23.032084+00:00",
+      "isolation_completed_at_utc": "2026-11-17T06:22:48.587279+00:00",
+      "isolation_elapsed_seconds": 25.555,
+      "namespace_process_exit_observed": true
+    },
+    {
+      "suite": "tests/preflight.sh",
+      "started_at_utc": "2026-11-17T06:22:48.619780+00:00",
+      "completed_at_utc": "2026-11-17T06:22:48.837397+00:00",
+      "elapsed_seconds": 0.218,
+      "exit_code": 0,
+      "status": "passed",
+      "diagnostics": {
+        "scenario_counts": {
+          "passed": 0,
+          "failed": 0
+        },
+        "failed_scenarios": [],
+        "shellcheck": [],
+        "source_locations": [],
+        "category_counts": {},
+        "rejected_scenario_count": 0,
+        "truncated": false
+      },
+      "temporary_entries_before_namespace_release": 0,
+      "isolation_started_at_utc": "2026-11-17T06:22:48.588043+00:00",
+      "isolation_completed_at_utc": "2026-11-17T06:22:48.852214+00:00",
+      "isolation_elapsed_seconds": 0.264,
+      "namespace_process_exit_observed": true
+    }
+  ],
+  "cleanup": {
+    "raw_logs_uploaded": false,
+    "runtime_download_retained": false,
+    "temporary_storage": "per-suite tmpfs discarded on namespace exit",
+    "private_runtime_created": true,
+    "private_runtime_removed": true
+  },
+  "exclusions": [
+    "No deployment or production credentials, state, configuration or customer data",
+    "No real VPS IP replacement, external client connectivity or cloud firewall validation",
+    "Real fixed Xray validates generated configuration; no external protocol session",
+    "Artifact contains no raw logs, fixtures, private keys, passwords or share links"
+  ],
+  "installer_version": "0.2.24",
+  "runtime": {
+    "version": "v26.3.27",
+    "archive_sha256": "23cd9af937744d97776ee35ecad4972cf4b2109d1e0fe6be9930467608f7c8ae",
+    "official_dgst_file_sha256": "052fc1c5c4bd5b44d799f785792a9631bce8da4aa0d385a783e9a711ad352a58",
+    "official_dgst_matched": true,
+    "pinned_sha256_matched": true,
+    "files_sha256": {
+      "xray": "8255dd939c34cf966cc91517b6324dd3c8d0bcf49ffac8beca049a38c46845ed",
+      "geoip.dat": "744c97b74c52bae2ac8664fef6ac481d7765cb8432a0df54f0368a88b9b4a354",
+      "geosite.dat": "adf92de0cfc70e458b399f04c5f912bf42d115ed7e37281b30e2f1c68605e4e9"
+    }
+  },
+  "source_unchanged": true,
+  "completed_at_utc": "2026-11-17T06:22:48.857180+00:00"
+}

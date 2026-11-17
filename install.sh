@@ -1339,14 +1339,24 @@ assert_model_port_available() {
 }
 
 collect_global_settings() {
-  local detected_ip reality_migrated='no'
+  local detected_ip requested_address='' reality_migrated='no'
 
   if [[ -n "${XRAY_CHAIN_ADDRESS:-}" ]]; then
     SERVER_ADDRESS="$(normalize_entry_address "$XRAY_CHAIN_ADDRESS")" \
       || die "XRAY_CHAIN_ADDRESS 格式错误：请填写完整入口域名或 IPv4，不要包含协议、端口或凭据。"
   else
-    detected_ip="$(detect_public_ipv4 || true)"
-    SERVER_ADDRESS="$detected_ip"
+    if [[ -t 0 ]]; then
+      if ! IFS= read -r -p '入口域名（直接回车 = 使用 VPS 本机 IP）: ' requested_address; then
+        die "未读取到入口域名选择；安装已停止，请重新执行后输入域名或直接回车。"
+      fi
+    fi
+    if [[ -n "$requested_address" ]]; then
+      SERVER_ADDRESS="$(normalize_entry_address "$requested_address")" \
+        || die "入口域名格式错误：请填写完整域名，不要包含协议、端口、路径或凭据；重新执行并直接回车可使用 VPS 本机 IP。"
+    else
+      detected_ip="$(detect_public_ipv4 || true)"
+      SERVER_ADDRESS="$detected_ip"
+    fi
   fi
   if ! valid_ipv4_or_domain "$SERVER_ADDRESS"; then
     prompt_default SERVER_ADDRESS "未能自动识别公网 IPv4，请输入 VPS 公网 IPv4 或域名" ''

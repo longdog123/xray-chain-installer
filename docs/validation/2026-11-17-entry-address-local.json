@@ -33,9 +33,9 @@
   ],
   "linux_transaction_suite": {
     "file": "tests/entry-address.sh",
-    "cases": 52,
-    "execution": "The two new precision cases await GitHub-hosted Linux execution; no local Linux suite was run.",
-    "test_sha256": "87cda1a2da625dd69dbb1d499b32a0ebc8b259a02baabb7a37db6212e83958d1",
+    "cases": 57,
+    "execution": "Current 57-case revision awaits GitHub-hosted Linux execution; no local Linux suite was run.",
+    "test_sha256": "0b16ab7eef60c7d56f593ddca896e5c4129e38099300354dcb993676b9343b7c",
     "display_extension": {
       "recorded_at": "2026-11-17T06:08:08.981084+00:00",
       "new_cases": 13,
@@ -57,6 +57,25 @@
         "Candidate-only externalId rounding is rejected by the production numeric-token guard before backup or atomic write."
       ],
       "execution": "Pending GitHub-hosted Linux; the local fixture construction check is not a production transaction result."
+    },
+    "initial_prompt_extension": {
+      "recorded_at": "2026-11-17T06:27:55.664537+00:00",
+      "new_cases": 5,
+      "prior_cases_retained": 52,
+      "cases": [
+        "initial-prompt-domain",
+        "initial-prompt-empty",
+        "initial-prompt-invalid",
+        "initial-prompt-eof",
+        "initial-env-tty"
+      ],
+      "scope": [
+        "Real collect_global_settings receives PTY stdin with piped stdout, proving input-only terminal detection.",
+        "Domain input is normalized and suppresses public-IP probing; Enter defaults to one machine-IP probe.",
+        "Malformed input or EOF fails without echoing credentials, writing installed state or probing.",
+        "Explicit XRAY_CHAIN_ADDRESS has priority even when terminal input is EOF and must not prompt."
+      ],
+      "execution": "Pending GitHub-hosted Linux; no PTY execution claimed locally."
     }
   },
   "cleanup": "No local runtime, network, temporary fixture, state/config or service was created by the narrow shell checks.",
@@ -77,6 +96,17 @@
         "Both precision fixtures preserve exact Python integers; the byte-level injection changes only one candidate externalId and never the source file"
       ],
       "cleanup": "Synthetic Windows temporary directory removed by TemporaryDirectory; no network, service or Linux runtime used."
+    },
+    {
+      "completed_at": "2026-11-17T06:27:55.664537+00:00",
+      "test_sha256": "0b16ab7eef60c7d56f593ddca896e5c4129e38099300354dcb993676b9343b7c",
+      "checks": [
+        "Bash -n passed",
+        "Embedded Python AST parsed",
+        "ShellCheck 0.9.0 exited 0 without diagnostics",
+        "Literal test-case list contains 57 unique cases including all prior 52"
+      ],
+      "cleanup": "No temporary fixture, network, service or Linux runtime used."
     }
   ]
 }

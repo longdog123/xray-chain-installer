@@ -122,7 +122,9 @@ sys.stdout.buffer.write(changed)
   mkdir -p "$BACKUP_DIR" "${case_dir}/model-work"
 
   if [[ "$scenario" == initial-* ]]; then
-    [[ "$scenario" == 'initial-default' ]] || export XRAY_CHAIN_ADDRESS="$value"
+    if [[ "$scenario" != 'initial-default' && "$scenario" != initial-prompt-* ]]; then
+      export XRAY_CHAIN_ADDRESS="$value"
+    fi
     set +e
     ( set -e; collect_global_settings; printf '%s\n' "$SERVER_ADDRESS" >"${case_dir}/initial-address" ) \
       >"${case_dir}/display" 2>&1
@@ -217,6 +219,9 @@ cases += [("malformed-" + str(index), value) for index, value in enumerate([
     "entry.example.com/fixture-password", "entry.example.com\nfixture-password", "entry.example.com.."])]
 cases += [("initial-domain", "Entry.Example.COM."), ("initial-ipv4", "203.0.113.30"),
           ("initial-default", ""), ("initial-invalid", "https://fixture-user:fixture-password@entry.example.com")]
+cases += [("initial-prompt-domain", "Entry.Example.COM."), ("initial-prompt-empty", ""),
+          ("initial-prompt-invalid", "https://fixture-user:fixture-password@entry.example.com"),
+          ("initial-prompt-eof", ""), ("initial-env-tty", "Entry.Example.COM.")]
 cases += [(name, domain) for name in (
     "display-command-all-tty", "display-command-single-tty", "display-main-all-pipe",
     "display-standalone-noqr-tty", "display-standalone-qr-pipe", "display-all-tty",
@@ -322,10 +327,12 @@ with tempfile.TemporaryDirectory(prefix="puppyip-entry-address.") as directory:
                         break
                 process.wait(timeout=5)
                 stdout, stderr = b"".join(chunks).replace(b"\r\n", b"\n"), b""
-            elif scenario in {"empty-tty", "domain-tty"}:
+            elif scenario in {"empty-tty", "domain-tty", "initial-env-tty"} or scenario.startswith("initial-prompt-"):
                 master, slave = pty.openpty()
                 process = subprocess.Popen(command, stdin=slave, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                os.write(master, (argument + "\n").encode())
+                # EOF also proves that an explicit environment value needs no terminal input.
+                terminal_input = b"\x04" if scenario in {"initial-prompt-eof", "initial-env-tty"} else (argument + "\n").encode()
+                os.write(master, terminal_input)
                 stdout, stderr = process.communicate(timeout=60)
             else:
                 process = subprocess.run(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=60)
@@ -333,7 +340,7 @@ with tempfile.TemporaryDirectory(prefix="puppyip-entry-address.") as directory:
             require(process.returncode == 0, "fixture worker failed outside the address operation")
             status = int((folder / "status").read_text())
             output = ((folder / "display").read_text() if (folder / "display").exists() else "") + (stdout + stderr).decode()
-            failure = scenario.startswith("malformed-") or scenario in {"no-argument", "empty-argument", "extra-argument", "backup-failure", "atomic-failure", "lock-busy", "precision-loss", "auto-ambiguous", "auto-nat", "auto-private", "auto-ip-failure", "auto-probe-failure", "initial-invalid"}
+            failure = scenario.startswith("malformed-") or scenario in {"no-argument", "empty-argument", "extra-argument", "backup-failure", "atomic-failure", "lock-busy", "precision-loss", "auto-ambiguous", "auto-nat", "auto-private", "auto-ip-failure", "auto-probe-failure", "initial-invalid", "initial-prompt-invalid", "initial-prompt-eof"}
             require((status != 0) == failure, "address operation success/failure differs from the contract")
             require(not any(secret in output for secret in ("fixture-password", "fixture-user", "fixture-private-key")), "error output exposed credentials or private material")
             require(not (folder / "forbidden").exists(), "address operation invoked DNS, core, service, confirmation or wrong ownership")
@@ -341,9 +348,13 @@ with tempfile.TemporaryDirectory(prefix="puppyip-entry-address.") as directory:
             if scenario.startswith("initial-"):
                 require((folder / "state.json").read_bytes() == before, "initial settings modified an installed state")
                 if not failure:
-                    expected = domain if scenario == "initial-domain" else "203.0.113.30" if scenario == "initial-ipv4" else "203.0.113.20"
+                    expected = domain if scenario in {"initial-domain", "initial-prompt-domain", "initial-env-tty"} else "203.0.113.30" if scenario == "initial-ipv4" else "203.0.113.20"
                     require((folder / "initial-address").read_text().strip() == expected, "initial environment address was ignored or not normalized")
-                require(len(lines(folder / "curl-calls")) == (1 if scenario == "initial-default" else 0), "explicit initial address unexpectedly probed the network")
+                require(len(lines(folder / "curl-calls")) == (1 if scenario in {"initial-default", "initial-prompt-empty"} else 0), "initial address selection probed unexpectedly or skipped the default-IP probe")
+                if scenario.startswith("initial-prompt-"):
+                    require("域名" in output and "回车" in output, "first interactive installation did not explain the domain/Enter choice")
+                if scenario == "initial-env-tty":
+                    require("回车" not in output, "explicit initial environment address still prompted for input")
             else:
                 display_case = scenario.startswith("display-")
                 unchanged = failure or display_case or scenario in {"same", "empty-tty"}
